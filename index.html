@@ -20,20 +20,6 @@
   <!-- Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   
-  <!-- Fix for tracking prevention blocking localStorage -->
-  <script>
-    // Polyfill localStorage if blocked by tracking prevention
-    if (typeof localStorage === 'undefined' || !localStorage) {
-      window.localStorage = {
-        _data: {},
-        setItem: function(id, val) { return this._data[id] = String(val); },
-        getItem: function(id) { return this._data.hasOwnProperty(id) ? this._data[id] : null; },
-        removeItem: function(id) { return delete this._data[id]; },
-        clear: function() { return this._data = {}; }
-      };
-    }
-  </script>
-  
   <!-- Styles -->
   <link rel="stylesheet" href="./styles.css">
 </head>
@@ -59,28 +45,24 @@
   <script src="./app.js"></script>
   <script src="./app-extensions.js"></script>
   
-  <!-- Initialize App - MUST be after all scripts -->
+  <!-- Service Worker Registration -->
   <script>
-    // Wait for app.js to fully load before initializing
-    async function initializeApp() {
-      console.log('🚀 Initializing Athr Platform...');
-      
-      // Wait for APP_JS_LOADED signal
-      let attempts = 0;
-      while (!window.APP_JS_LOADED && attempts < 100) {
-        await new Promise(resolve => setTimeout(resolve, 50));
-        attempts++;
-      }
-      
-      if (!window.APP_JS_LOADED) {
-        console.error('❌ Timeout waiting for app.js to load');
-        return;
-      }
-      
-      // Initialize data structures
-      initData();
-      
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+          .then(reg => console.log('✅ Service Worker registered'))
+          .catch(err => console.log('❌ Service Worker registration failed:', err));
+      });
+    }
+  </script>
+
+  <!-- Initialize App -->
+  <script>
+    // Wait for DOM and all scripts to load
+    window.addEventListener('DOMContentLoaded', async () => {
       try {
+        console.log('🚀 Initializing Athr Platform...');
+        
         // Initialize auth and check session
         const user = await Auth.init();
         
@@ -88,13 +70,13 @@
           console.log('✅ User authenticated:', user.name);
           STATE.user = user;
           
-          // Load data in background (don't wait)
-          loadDataFromSupabase();
+          // Load data from Supabase
+          await loadDataFromSupabase();
         } else {
           console.log('ℹ️ No active session - showing login');
         }
         
-        // Start router NOW - don't wait for data
+        // Start router
         handleRoute();
         
         console.log('✅ App initialized successfully');
@@ -113,26 +95,9 @@
           </div>
         `;
       }
-    }
-    
-    // Start initialization immediately - DOM is already loaded at this point
-    console.log('📍 Inline script executing, readyState:', document.readyState);
-    initializeApp();
-  </script>
-  
-  <!-- Service Worker Registration -->
-  <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js')
-          .then(reg => console.log('✅ Service Worker registered'))
-          .catch(err => console.log('❌ Service Worker registration failed:', err));
-      });
-    }
-  </script>
+    });
 
-  <!-- Load all data from Supabase -->
-  <script>
+    // Load all data from Supabase
     async function loadDataFromSupabase() {
       console.log('📥 Loading data from Supabase...');
       

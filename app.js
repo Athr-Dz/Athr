@@ -917,22 +917,20 @@ function renderLogin() {
             Auth.loginWithEmail(form.email.value, form.password.value)
               .then(async (user) => {
                 STATE.user = user;
+                await loadDataFromSupabase();
+                persistState();
                 
-                // Navigate FIRST (shows dashboard immediately)
-                if (user.role === 'student') {
-                  STATE.user.studentId = user.id;
-                  location.hash = '/parent/dashboard';
-                } else {
-                  location.hash = '/' + user.role + '/dashboard';
+                // Wait for app.js to fully load before navigating
+                if (document.readyState === 'loading') {
+                  await new Promise(resolve => document.addEventListener('DOMContentLoaded', resolve));
                 }
                 
-                // Load data in background
-                loadDataFromSupabase().then(() => {
-                  persistState();
-                  // Refresh the view with loaded data
-                  handleRoute();
-                });
-                
+                if (user.role === 'student') {
+                  STATE.user.studentId = user.id;
+                  navigate('/parent/dashboard');
+                } else {
+                  navigate('/' + user.role + '/dashboard');
+                }
                 toast('مرحباً ' + user.name);
               })
               .catch((error) => {
@@ -13511,8 +13509,48 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  // NOTE: handleRoute() is now called from index.html after all scripts load
-  // This DOMContentLoaded handler only sets up event delegation
+  // If user just logged out, skip session restore and show login
+  if (sessionStorage.getItem('athr-logged-out')) {
+    sessionStorage.removeItem('athr-logged-out');
+    handleRoute();
+    return;
+  }
+
+  // Wait for Auth to be available (in case scripts load out of order)
+  let attempts = 0;
+  while (!window.Auth && attempts < 50) {
+    await new Promise(resolve => setTimeout(resolve, 100));
+    attempts++;
+  }
+
+  if (!window.Auth) {
+    console.error('Auth module failed to load');
+    handleRoute();
+    return;
+  }
+
+  // Always try to restore session first — regardless of hash
+  // This fixes the stuck/blank screen after disconnect or tab reopen
+  try {
+    const user = await Auth.init();
+    if (user) {
+      STATE.user = user;
+      await loadDataFromSupabase();
+      // If hash is empty or login page, redirect to dashboard
+      const hash = location.hash.replace(/^#/, '');
+      if (!hash || hash === '/' || hash === '/login') {
+        navigate(`/${user.role}/dashboard`);
+      } else {
+        handleRoute();
+      }
+      return;
+    }
+  } catch (error) {
+    console.error('Auth init error:', error);
+  }
+
+  // No session — show login
+  handleRoute();
 });
 
 // =========================================================
@@ -13531,8 +13569,4 @@ window.addEventListener('load', () => {
     }
   });
 });
-
-// Signal that app.js is fully loaded
-window.APP_JS_LOADED = true;
-console.log('✅ app.js fully loaded - all functions defined');
 }
