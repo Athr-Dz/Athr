@@ -13507,48 +13507,8 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  // If user just logged out, skip session restore and show login
-  if (sessionStorage.getItem('athr-logged-out')) {
-    sessionStorage.removeItem('athr-logged-out');
-    handleRoute();
-    return;
-  }
-
-  // Wait for Auth to be available (in case scripts load out of order)
-  let attempts = 0;
-  while (!window.Auth && attempts < 50) {
-    await new Promise(resolve => setTimeout(resolve, 100));
-    attempts++;
-  }
-
-  if (!window.Auth) {
-    console.error('Auth module failed to load');
-    handleRoute();
-    return;
-  }
-
-  // Always try to restore session first — regardless of hash
-  // This fixes the stuck/blank screen after disconnect or tab reopen
-  try {
-    const user = await Auth.init();
-    if (user) {
-      STATE.user = user;
-      await loadDataFromSupabase();
-      // If hash is empty or login page, redirect to dashboard
-      const hash = location.hash.replace(/^#/, '');
-      if (!hash || hash === '/' || hash === '/login') {
-        navigate(`/${user.role}/dashboard`);
-      } else {
-        handleRoute();
-      }
-      return;
-    }
-  } catch (error) {
-    console.error('Auth init error:', error);
-  }
-
-  // No session — show login
-  handleRoute();
+  // NOTE: handleRoute() is now called from index.html after all scripts load
+  // This DOMContentLoaded handler only sets up event delegation
 });
 
 // =========================================================
