@@ -1,0 +1,33 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node --check app.js)",
+      "Bash(node --check data.js)",
+      "Bash(python3 -m http.server 8080)",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\n\" http://localhost:8080/)",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code} index.html\\\\n\" http://localhost:8080/index.html)",
+      "Bash(node --check sw.js)",
+      "Bash(curl -s -o /dev/null -w \"manifest %{http_code}\\\\n\" http://localhost:8080/manifest.webmanifest)",
+      "Bash(curl -s -o /dev/null -w \"sw.js %{http_code}\\\\n\" http://localhost:8080/sw.js)",
+      "Bash(awk 'NR==2403{flag=1} flag && /^}$/ {print NR; flag=0}' \"/Users/omar/Desktop/Clude code/Arwa/app.js\")",
+      "Bash(awk 'NR>=2645{if\\(/^function /\\){print NR;exit}}' \"/Users/omar/Desktop/Clude code/Arwa/app.js\")",
+      "Bash(curl -s -o /dev/null -w \"css %{http_code}\\\\n\" http://localhost:8080/styles.css)",
+      "Bash(curl -s -o /dev/null -w \"html %{http_code} | css %{http_code}\\\\n\" http://localhost:8080/)",
+      "Bash(curl -s -o /dev/null -w \"css   %{http_code}\\\\n\" 'http://localhost:8080/styles.css?v=editorial-2')",
+      "Bash(curl -s -o /dev/null -w \"html %{http_code}\\\\n\" http://localhost:8080/)",
+      "Bash(curl -s -o /dev/null -w \"css %{http_code}\\\\n\" 'http://localhost:8080/styles.css?v=feminine-1')",
+      "Bash(curl -s -o /dev/null -w \"html %{http_code} | css %{http_code}\\\\n\" 'http://localhost:8080/styles.css?v=feminine-2')",
+      "Bash(curl -s -o /dev/null -w \"html %{http_code} | css %{http_code}\\\\n\" 'http://localhost:8080/styles.css?v=feminine-4')",
+      "Bash(wrangler --version)",
+      "Bash(lsof -ti:8080)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:8080/)",
+      "Bash(npx wrangler@latest --version)",
+      "Bash(npx wrangler@latest login)",
+      "Bash(npx wrangler@latest pages deploy . --project-name=athr --commit-dirty=true)",
+      "Bash(npx wrangler@latest pages project create athr --production-branch=main)",
+      "Bash(npx wrangler@latest pages deploy . --project-name=athr --branch=main --commit-dirty=true)",
+      "Bash(curl -s -o /dev/null -w \"primary: %{http_code}\\\\n\" https://athr-2n5.pages.dev/)",
+      "Bash(curl -s -o /dev/null -w \"deploy : %{http_code}\\\\n\" https://65231afa.athr-2n5.pages.dev/)"
+    ]
+  }
+}

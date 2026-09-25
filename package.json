@@ -1,0 +1,18 @@
+{
+  "name": "athr-platform",
+  "version": "2.0.0",
+  "description": "أثر - نظام متابعة الطالبات",
+  "scripts": {
+    "dev": "npx http-server -p 3000 -o"
+  },
+  "keywords": [
+    "education",
+    "arabic",
+    "special-needs"
+  ],
+  "author": "Omar",
+  "license": "MIT",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.105.4"
+  }
+}
