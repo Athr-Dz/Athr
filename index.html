@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>منصة أثر — الابتدائية 382</title>
+  
+  <!-- PWA Meta Tags -->
+  <meta name="description" content="منصة أثر لإدارة برامج التربية الخاصة والنطق والتخاطب">
+  <meta name="theme-color" content="#6366f1">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" type="image/png" href="./images/icon-192.png">
+  <link rel="apple-touch-icon" href="./images/icon-192.png">
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Supabase -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  
+  <!-- Styles -->
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <!-- App Root -->
+  <div id="root">
+    <div style="display: flex; align-items: center; justify-content: center; min-height: 100vh; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+      <div style="text-align: center; color: white;">
+        <div style="font-size: 48px; margin-bottom: 16px;">⏳</div>
+        <div style="font-size: 20px; font-weight: 600;">جاري التحميل...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container (created dynamically by app.js) -->
+  
+  <!-- Modal Container (created dynamically by app.js) -->
+
+  <!-- Scripts -->
+  <script src="./supabase-config.js"></script>
+  <script src="./data.js"></script>
+  <script src="./auth.js"></script>
+  <script src="./app.js"></script>
+  
+  <!-- Service Worker Registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+          .then(reg => console.log('✅ Service Worker registered'))
+          .catch(err => console.log('❌ Service Worker registration failed:', err));
+      });
+    }
+  </script>
+
+  <!-- Initialize App -->
+  <script>
+    // Wait for DOM and all scripts to load
+    window.addEventListener('DOMContentLoaded', async () => {
+      try {
+        console.log('🚀 Initializing Athr Platform...');
+        
+        // Initialize auth and check session
+        const user = await Auth.init();
+        
+        if (user) {
+          console.log('✅ User authenticated:', user.name);
+          STATE.user = user;
+          
+          // Load data from Supabase
+          await loadDataFromSupabase();
+        } else {
+          console.log('ℹ️ No active session - showing login');
+        }
+        
+        // Start router
+        handleRoute();
+        
+        console.log('✅ App initialized successfully');
+      } catch (error) {
+        console.error('❌ App initialization failed:', error);
+        document.getElementById('root').innerHTML = `
+          <div style="display: flex; align-items: center; justify-content: center; min-height: 100vh; background: #fee; color: #c00; padding: 24px; text-align: center;">
+            <div>
+              <div style="font-size: 48px; margin-bottom: 16px;">⚠️</div>
+              <div style="font-size: 20px; font-weight: 600; margin-bottom: 8px;">حدث خطأ في تحميل المنصة</div>
+              <div style="font-size: 14px; color: #666; margin-bottom: 16px;">${error.message}</div>
+              <button onclick="location.reload()" style="padding: 12px 24px; background: #c00; color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer;">
+                إعادة المحاولة
+              </button>
+            </div>
+          </div>
+        `;
+      }
+    });
+
+    // Load all data from Supabase
+    async function loadDataFromSupabase() {
+      console.log('📥 Loading data from Supabase...');
+      
+      try {
+        // Load users (teachers, principal)
+        const { data: users, error: usersError } = await window.supabaseClient
+          .from('users')
+          .select('*')
+          .order('name');
+        
+        if (usersError) throw usersError;
+        STATE.data.users = users || [];
+        console.log(`✅ Loaded ${users?.length || 0} users`);
+
+        // Load students
+        const { data: students, error: studentsError } = await window.supabaseClient
+          .from('students')
+          .select('*')
+          .order('name');
+        
+        if (studentsError) throw studentsError;
+        STATE.data.students = students || [];
+        console.log(`✅ Loaded ${students?.length || 0} students`);
+
+        // Load student followups
+        const { data: followups, error: followupsError } = await window.supabaseClient
+          .from('student_followups')
+          .select('*')
+          .order('created_at', { ascending: false });
+        
+        if (followupsError) throw followupsError;
+        STATE.data.studentFollowups = followups || [];
+        console.log(`✅ Loaded ${followups?.length || 0} followups`);
+
+        // Load auditory memory tests
+        const { data: memoryTests, error: memoryError } = await window.supabaseClient
+          .from('auditory_memory_tests')
+          .select('*')
+          .order('created_at', { ascending: false });
+        
+        if (memoryError) throw memoryError;
+        STATE.data.auditoryMemoryTests = memoryTests || [];
+        console.log(`✅ Loaded ${memoryTests?.length || 0} auditory memory tests`);
+
+        // Load initial reports
+        const { data: reports, error: reportsError } = await window.supabaseClient
+          .from('initial_reports')
+          .select('*')
+          .order('created_at', { ascending: false });
+        
+        if (reportsError) throw reportsError;
+        STATE.data.initialReports = reports || [];
+        console.log(`✅ Loaded ${reports?.length || 0} initial reports`);
+
+        // Load IEPs (individual education plans)
+        const { data: ieps, error: iepsError } = await window.supabaseClient
+          .from('individual_education_plans')
+          .select('*')
+          .order('created_at', { ascending: false });
+        
+        if (iepsError) throw iepsError;
+        STATE.data.plans = ieps || [];
+        console.log(`✅ Loaded ${ieps?.length || 0} IEPs`);
+
+        // Load attendance records
+        const { data: attendance, error: attendanceError } = await window.supabaseClient
+          .from('attendance')
+          .select('*')
+          .order('attendance_date', { ascending: false });
+        
+        if (attendanceError) throw attendanceError;
+        STATE.data.attendance = attendance || [];
+        console.log(`✅ Loaded ${attendance?.length || 0} attendance records`);
+
+        console.log('✅ All data loaded successfully from Supabase');
+        
+        // Persist to localStorage for offline support
+        persistState();
+        
+      } catch (error) {
+        console.error('❌ Error loading data from Supabase:', error);
+        toast('حدث خطأ في تحميل البيانات', 'error');
+        
+        // Try to load from localStorage as fallback
+        const saved = loadStateFromStorage();
+        if (saved) {
+          console.log('ℹ️ Loaded data from localStorage (offline mode)');
+          if (saved.studentFollowups) STATE.data.studentFollowups = saved.studentFollowups;
+          if (saved.auditoryMemoryTests) STATE.data.auditoryMemoryTests = saved.auditoryMemoryTests;
+          if (saved.initialReports) STATE.data.initialReports = saved.initialReports;
+        }
+      }
+    }
+
+    // Global helper to refresh data after mutations
+    window.refreshData = async function() {
+      await loadDataFromSupabase();
+      handleRoute(); // Re-render current view
+    };
+  </script>
+</body>
+</html>
