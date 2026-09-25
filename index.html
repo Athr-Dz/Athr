@@ -49,21 +49,10 @@
   <script>
     // Wait for app.js to fully load before initializing
     async function initializeApp() {
-      console.log('⏳ Waiting for app.js to load...');
+      console.log('⏳ Waiting for scripts to parse...');
       
-      // Wait for APP_JS_LOADED signal (max 5 seconds)
-      let attempts = 0;
-      while (!window.APP_JS_LOADED && attempts < 100) {
-        await new Promise(resolve => setTimeout(resolve, 50));
-        attempts++;
-      }
-      
-      if (!window.APP_JS_LOADED) {
-        console.warn('⚠️ app.js signal not received, proceeding anyway...');
-        // Continue anyway after timeout
-      } else {
-        console.log('✅ app.js loaded signal received');
-      }
+      // Give app.js time to fully parse (1 second)
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
       console.log('🚀 Initializing app...');
       
