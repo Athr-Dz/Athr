@@ -47,21 +47,35 @@
   
   <!-- Initialize App - MUST be after all scripts -->
   <script>
-    // App initialization is now handled by app.js itself
-    // This function is kept for backwards compatibility but does nothing
+    // Wait for app.js to fully load before initializing
     async function initializeApp() {
-      console.log('⚠️ initializeApp called from index.html - should be handled by app.js');
-    }
-    
-    // Old initialization code (kept for reference but not used)
-    async function legacyInitializeApp() {
-      console.log('⏳ Waiting for scripts to parse...');
+      console.log('🚀 Initializing Athr Platform...');
       
-      // Give app.js time to fully parse (1 second)
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Wait for APP_JS_LOADED signal
+      let attempts = 0;
+      while (!window.APP_JS_LOADED && attempts < 100) {
+        await new Promise(resolve => setTimeout(resolve, 50));
+        attempts++;
+      }
       
-      console.log('🚀 Initializing app...');
+      if (!window.APP_JS_LOADED) {
+        console.error('❌ Timeout waiting for app.js to load');
+        return;
+      }
       
+      // Initialize data structures
+      initData();
+      
+      // Initialize auth
+      const user = await window.Auth.init();
+      if (user) {
+        STATE.user = user;
+        console.log('ℹ️ Active session found:', user.email, user.role);
+      } else {
+        console.log('ℹ️ No active session - showing login');
+      }
+      
+      // Handle current route
       try {
         // Initialize auth and check session
         const user = await Auth.init();
@@ -98,8 +112,11 @@
     }
     
     // Start initialization when DOM is ready
-    // Initialization is now handled by app.js at the end of the file
-    console.log('✅ index.html loaded - waiting for app.js to initialize');
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initializeApp);
+    } else {
+      initializeApp();
+    }
   </script>
   
   <!-- Service Worker Registration -->

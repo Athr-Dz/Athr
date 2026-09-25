@@ -13531,25 +13531,4 @@ window.addEventListener('load', () => {
 // Signal that app.js is fully loaded
 window.APP_JS_LOADED = true;
 console.log('✅ app.js fully loaded - all functions defined');
-
-// Initialize app NOW that all functions are defined
-(async function autoInitialize() {
-  console.log('🚀 Auto-initializing from app.js...');
-  
-  // Initialize data structures
-  if (!STATE.data) {
-    initData();
-  }
-  
-  // Initialize auth and handle route
-  try {
-    await window.Auth.init();
-    await handleRoute();
-    console.log('✅ App initialized successfully');
-  } catch (error) {
-    console.error('❌ Initialization error:', error);
-    // Show login on error
-    renderLogin();
-  }
-})();
 }
