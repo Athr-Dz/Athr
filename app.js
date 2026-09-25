@@ -12730,9 +12730,13 @@ document.addEventListener('submit', async (e) => {
 document.addEventListener('submit', async (e) => {
   if (e.target.matches('[data-form="real-login"]')) {
     e.preventDefault();
+    e.stopPropagation(); // Stop event from bubbling
+    
     const form = e.target;
     const submitBtn = form.querySelector('button[type="submit"]');
     const originalText = submitBtn.innerHTML;
+    
+    console.log('🔐 Login form submitted');
     
     try {
       submitBtn.disabled = true;
@@ -12740,15 +12744,27 @@ document.addEventListener('submit', async (e) => {
 
       const email = form.email.value;
       const password = form.password.value;
+      
+      console.log('📧 Email:', email);
+      console.log('🔑 Attempting authentication...');
 
       // Real authentication with Supabase
       const user = await Auth.loginWithEmail(email, password);
+      
+      console.log('✅ Auth successful, user:', user);
+      
       STATE.user = user;
+      
+      console.log('📥 Loading data from Supabase...');
       
       // Load data from Supabase
       await loadDataFromSupabase();
       
+      console.log('💾 Persisting state...');
+      
       persistState();
+      
+      console.log('🧭 Navigating to dashboard...');
       
       // Students see parent dashboard (their own data)
       if (user.role === 'student') {
@@ -12760,8 +12776,11 @@ document.addEventListener('submit', async (e) => {
       }
       
       toast(`مرحباً ${user.name}`);
+      
+      console.log('✅ Login complete!');
+      
     } catch (error) {
-      console.error('Login error:', error);
+      console.error('❌ Login error:', error);
       
       const email = form.email?.value || 'unknown';
       
@@ -12773,7 +12792,7 @@ document.addEventListener('submit', async (e) => {
         errorMsg = `⚠️ تم تسجيل الدخول بنجاح، لكن لم يتم العثور على حساب لهذا البريد.
 
 هل أنت:
-• المديرة؟ → شغّل ملف FRESH-START.sql في Supabase
+• المديرة؟ → شغّل ملف FIX-PRINCIPAL-SIMPLE.sql في Supabase
 • طالب؟ → يجب أن تقوم المديرة/المعلمة بإنشاء حسابك أولاً
 
 البريد المستخدم: ${email}`;
