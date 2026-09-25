@@ -13567,4 +13567,8 @@ window.addEventListener('load', () => {
     }
   });
 });
+
+// Signal that app.js is fully loaded
+window.APP_JS_LOADED = true;
+console.log('✅ app.js fully loaded - all functions defined');
 }

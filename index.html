@@ -47,11 +47,23 @@
   
   <!-- Initialize App - MUST be after all scripts -->
   <script>
-    // Wait for DOM and all scripts to load
-    window.addEventListener('DOMContentLoaded', async () => {
+    // Wait for app.js to fully load before initializing
+    async function initializeApp() {
+      // Wait for APP_JS_LOADED signal
+      let attempts = 0;
+      while (!window.APP_JS_LOADED && attempts < 100) {
+        await new Promise(resolve => setTimeout(resolve, 50));
+        attempts++;
+      }
+      
+      if (!window.APP_JS_LOADED) {
+        console.error('❌ app.js failed to load completely');
+        return;
+      }
+      
+      console.log('🚀 All scripts loaded, initializing app...');
+      
       try {
-        console.log('🚀 Initializing Athr Platform...');
-        
         // Initialize auth and check session
         const user = await Auth.init();
         
@@ -84,7 +96,14 @@
           </div>
         `;
       }
-    });
+    }
+    
+    // Start initialization when DOM is ready
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initializeApp);
+    } else {
+      initializeApp();
+    }
   </script>
   
   <!-- Service Worker Registration -->
