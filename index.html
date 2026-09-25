@@ -101,12 +101,9 @@
       }
     }
     
-    // Start initialization when DOM is ready
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', initializeApp);
-    } else {
-      initializeApp();
-    }
+    // Start initialization immediately - DOM is already loaded at this point
+    console.log('📍 Inline script executing, readyState:', document.readyState);
+    initializeApp();
   </script>
   
   <!-- Service Worker Registration -->
