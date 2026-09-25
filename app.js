@@ -13552,3 +13552,4 @@ console.log('✅ app.js fully loaded - all functions defined');
     renderLogin();
   }
 })();
+}
