@@ -45,18 +45,7 @@
   <script src="./app.js"></script>
   <script src="./app-extensions.js"></script>
   
-  <!-- Service Worker Registration -->
-  <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js')
-          .then(reg => console.log('✅ Service Worker registered'))
-          .catch(err => console.log('❌ Service Worker registration failed:', err));
-      });
-    }
-  </script>
-
-  <!-- Initialize App -->
+  <!-- Initialize App - MUST be after all scripts -->
   <script>
     // Wait for DOM and all scripts to load
     window.addEventListener('DOMContentLoaded', async () => {
@@ -76,7 +65,7 @@
           console.log('ℹ️ No active session - showing login');
         }
         
-        // Start router
+        // Start router - now all view functions are defined
         handleRoute();
         
         console.log('✅ App initialized successfully');
@@ -96,8 +85,21 @@
         `;
       }
     });
+  </script>
+  
+  <!-- Service Worker Registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+          .then(reg => console.log('✅ Service Worker registered'))
+          .catch(err => console.log('❌ Service Worker registration failed:', err));
+      });
+    }
+  </script>
 
-    // Load all data from Supabase
+  <!-- Load all data from Supabase -->
+  <script>
     async function loadDataFromSupabase() {
       console.log('📥 Loading data from Supabase...');
       
