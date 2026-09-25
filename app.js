@@ -60,6 +60,9 @@ const STORAGE_KEY = 'athr-state-v7';
 // Forward declarations for principal views (real implementations are later in file)
 let viewPrincipalDashboard, viewPrincipalTeachers, viewPrincipalStudents, viewPrincipalIEPs, viewPrincipalReports;
 
+// Also declare other view functions that are used early
+let viewSettings, viewNotFound, viewStudentProfile;
+
 function arNum(n) {
   // Use Latin (Western Arabic) numerals — cleaner with the editorial typography
   return String(n);
