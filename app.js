@@ -57,6 +57,9 @@ const I = (() => {
 /* --------------- STATE --------------- */
 const STORAGE_KEY = 'athr-state-v7';
 
+// Forward declarations for principal views (real implementations are later in file)
+let viewPrincipalDashboard, viewPrincipalTeachers, viewPrincipalStudents, viewPrincipalIEPs, viewPrincipalReports;
+
 function arNum(n) {
   // Use Latin (Western Arabic) numerals — cleaner with the editorial typography
   return String(n);
@@ -11123,7 +11126,7 @@ document.addEventListener('click', (e) => {
    PRINCIPAL (المديرة) VIEWS
    ========================================================= */
 
-function viewPrincipalDashboard() {
+viewPrincipalDashboard = function() {
   const teachers = STATE.data.users.filter(u => u.role === 'teacher');
   const students = STATE.data.students.filter(s => !s.archived);
   const parents = STATE.data.users.filter(u => u.role === 'parent');
@@ -11241,7 +11244,7 @@ function teacherPermissionPills(t) {
   `).join('');
 }
 
-function viewPrincipalTeachers() {
+viewPrincipalTeachers = function() {
   const teachers = STATE.data.users.filter(u => u.role === 'teacher');
 
   return `
@@ -11346,7 +11349,7 @@ function viewPrincipalTeachers() {
   `;
 }
 
-function viewPrincipalStudents() {
+viewPrincipalStudents = function() {
   const students = STATE.data.students.filter(s => !s.archived);
   const byGrade = {};
   students.forEach(s => {
@@ -11417,7 +11420,7 @@ function viewPrincipalStudents() {
 /* =========================================================
    PRINCIPAL - IEPs VIEW
    ========================================================= */
-function viewPrincipalIEPs() {
+viewPrincipalIEPs = function() {
   const students = STATE.data.students.filter(s => !s.archived);
   
   // Separate students by teacher type
@@ -11555,7 +11558,7 @@ function viewPrincipalIEPs() {
   `;
 }
 
-function viewPrincipalReports() {
+viewPrincipalReports = function() {
   const students = STATE.data.students.filter(s => !s.archived);
   const teachers = STATE.data.users.filter(u => u.role === 'teacher');
   const totalActivities = STATE.data.activities.length;
