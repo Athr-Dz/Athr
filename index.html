@@ -20,6 +20,20 @@
   <!-- Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   
+  <!-- Fix for tracking prevention blocking localStorage -->
+  <script>
+    // Polyfill localStorage if blocked by tracking prevention
+    if (typeof localStorage === 'undefined' || !localStorage) {
+      window.localStorage = {
+        _data: {},
+        setItem: function(id, val) { return this._data[id] = String(val); },
+        getItem: function(id) { return this._data.hasOwnProperty(id) ? this._data[id] : null; },
+        removeItem: function(id) { return delete this._data[id]; },
+        clear: function() { return this._data = {}; }
+      };
+    }
+  </script>
+  
   <!-- Styles -->
   <link rel="stylesheet" href="./styles.css">
 </head>
