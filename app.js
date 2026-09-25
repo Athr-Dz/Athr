@@ -904,7 +904,7 @@ function renderLogin() {
             <input name="password" type="password" required placeholder="••••••••" autocomplete="current-password">
           </div>
 
-          <button type="submit" class="btn lg block">
+          <button type="button" class="btn lg block" onclick="handleLoginClick(this)">
             ${I.check}<span>دخول</span>
           </button>
 
@@ -12725,6 +12725,85 @@ document.addEventListener('submit', async (e) => {
 /* =========================================================
    REAL AUTHENTICATION HANDLERS
    ========================================================= */
+
+// Handle login button click
+window.handleLoginClick = async function(btn) {
+  const form = btn.closest('form');
+  if (!form) return;
+  
+  const originalText = btn.innerHTML;
+  
+  console.log('🔐 Login button clicked');
+  
+  try {
+    btn.disabled = true;
+    btn.innerHTML = `<span>جاري تسجيل الدخول...</span>`;
+
+    const email = form.email.value;
+    const password = form.password.value;
+    
+    console.log('📧 Email:', email);
+    console.log('🔑 Attempting authentication...');
+
+    // Real authentication with Supabase
+    const user = await Auth.loginWithEmail(email, password);
+    
+    console.log('✅ Auth successful, user:', user);
+    
+    STATE.user = user;
+    
+    console.log('📥 Loading data from Supabase...');
+    
+    // Load data from Supabase
+    await loadDataFromSupabase();
+    
+    console.log('💾 Persisting state...');
+    
+    persistState();
+    
+    console.log('🧭 Navigating to dashboard...');
+    
+    // Students see parent dashboard (their own data)
+    if (user.role === 'student') {
+      // Set studentId so parent views work
+      STATE.user.studentId = user.id;
+      navigate('/parent/dashboard');
+    } else {
+      navigate(`/${user.role}/dashboard`);
+    }
+    
+    toast(`مرحباً ${user.name}`);
+    
+    console.log('✅ Login complete!');
+    
+  } catch (error) {
+    console.error('❌ Login error:', error);
+    
+    const email = form.email?.value || 'unknown';
+    
+    // Show user-friendly error message
+    let errorMsg = 'خطأ في تسجيل الدخول';
+    
+    if (error.message && error.message.includes('لم يتم العثور على ملف المستخدم')) {
+      // Profile not found - show detailed instructions
+      errorMsg = `⚠️ تم تسجيل الدخول بنجاح، لكن لم يتم العثور على حساب لهذا البريد.
+
+هل أنت:
+• المديرة؟ → شغّل ملف FIX-PRINCIPAL-SIMPLE.sql في Supabase
+• طالب؟ → يجب أن تقوم المديرة/المعلمة بإنشاء حسابك أولاً
+
+البريد المستخدم: ${email}`;
+    } else if (error.message && error.message.includes('Invalid login credentials')) {
+      errorMsg = 'البريد الإلكتروني أو كلمة المرور غير صحيحة';
+    } else if (error.message) {
+      errorMsg = error.message;
+    }
+    
+    toast(errorMsg, 'error');
+    btn.disabled = false;
+    btn.innerHTML = originalText;
+  }
+};
 
 // Handle Real Login Form
 document.addEventListener('submit', async (e) => {
