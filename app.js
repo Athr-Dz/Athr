@@ -891,7 +891,7 @@ function renderLogin() {
           <div class="login-clean-sub">نظام متابعة الطالبات</div>
         </div>
 
-        <form data-form="real-login" class="login-clean-section">
+        <form data-form="real-login" class="login-clean-section" onsubmit="return false;">
           <div class="login-clean-label">تسجيل الدخول</div>
           
           <div class="field">
