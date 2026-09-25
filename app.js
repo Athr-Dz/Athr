@@ -917,18 +917,22 @@ function renderLogin() {
             Auth.loginWithEmail(form.email.value, form.password.value)
               .then(async (user) => {
                 STATE.user = user;
-                await loadDataFromSupabase();
-                persistState();
                 
-                // Small delay to ensure all scripts loaded
-                await new Promise(resolve => setTimeout(resolve, 100));
-                
+                // Navigate FIRST (shows dashboard immediately)
                 if (user.role === 'student') {
                   STATE.user.studentId = user.id;
-                  navigate('/parent/dashboard');
+                  location.hash = '/parent/dashboard';
                 } else {
-                  navigate('/' + user.role + '/dashboard');
+                  location.hash = '/' + user.role + '/dashboard';
                 }
+                
+                // Load data in background
+                loadDataFromSupabase().then(() => {
+                  persistState();
+                  // Refresh the view with loaded data
+                  handleRoute();
+                });
+                
                 toast('مرحباً ' + user.name);
               })
               .catch((error) => {
