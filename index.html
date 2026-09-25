@@ -101,6 +101,9 @@
     async function loadDataFromSupabase() {
       console.log('📥 Loading data from Supabase...');
       
+      // Make sure STATE.data is initialized
+      if (!STATE.data) initData();
+      
       try {
         // Load users (teachers, principal)
         const { data: users, error: usersError } = await window.supabaseClient
