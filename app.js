@@ -911,6 +911,9 @@ function renderLogin() {
             btn.disabled = true;
             btn.innerHTML = '<span>جاري تسجيل الدخول...</span>';
             
+            // Make sure STATE.data exists
+            if (!STATE.data) initData();
+            
             Auth.loginWithEmail(form.email.value, form.password.value)
               .then(async (user) => {
                 STATE.user = user;
