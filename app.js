@@ -920,10 +920,8 @@ function renderLogin() {
                 await loadDataFromSupabase();
                 persistState();
                 
-                // Wait for app.js to fully load before navigating
-                if (document.readyState === 'loading') {
-                  await new Promise(resolve => document.addEventListener('DOMContentLoaded', resolve));
-                }
+                // Small delay to ensure all scripts loaded
+                await new Promise(resolve => setTimeout(resolve, 100));
                 
                 if (user.role === 'student') {
                   STATE.user.studentId = user.id;
