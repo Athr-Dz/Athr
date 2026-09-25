@@ -47,8 +47,14 @@
   
   <!-- Initialize App - MUST be after all scripts -->
   <script>
-    // Wait for app.js to fully load before initializing
+    // App initialization is now handled by app.js itself
+    // This function is kept for backwards compatibility but does nothing
     async function initializeApp() {
+      console.log('⚠️ initializeApp called from index.html - should be handled by app.js');
+    }
+    
+    // Old initialization code (kept for reference but not used)
+    async function legacyInitializeApp() {
       console.log('⏳ Waiting for scripts to parse...');
       
       // Give app.js time to fully parse (1 second)
@@ -92,11 +98,8 @@
     }
     
     // Start initialization when DOM is ready
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', initializeApp);
-    } else {
-      initializeApp();
-    }
+    // Initialization is now handled by app.js at the end of the file
+    console.log('✅ index.html loaded - waiting for app.js to initialize');
   </script>
   
   <!-- Service Worker Registration -->
