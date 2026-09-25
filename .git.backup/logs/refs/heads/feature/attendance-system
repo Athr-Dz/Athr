@@ -1,8 +1,0 @@
-0000000000000000000000000000000000000000 22a99e135e82bebf77b277ffbae3c9e3ad6662d5 Athr Platform <athr@athr382.sa> 1788623221 +0100	branch: Created from HEAD
-22a99e135e82bebf77b277ffbae3c9e3ad6662d5 26eb36a6a37365d870a1bc59c0b602b9179d22d3 Athr Platform <athr@athr382.sa> 1788623243 +0100	commit: feat: Add comprehensive attendance system with real-time sync
-26eb36a6a37365d870a1bc59c0b602b9179d22d3 2e6759b3ac5030d4b6a4331129084911722a6e49 Athr Platform <athr@athr382.sa> 1788623593 +0100	commit: fix: Correct attendance_stats view SQL syntax
-2e6759b3ac5030d4b6a4331129084911722a6e49 1bacd91b2236d3e83ed14bd2511fb3a5d623bd35 Athr Platform <athr@athr382.sa> 1788624138 +0100	commit: fix: Rename 'date' column to 'attendance_date' to avoid SQL keyword conflict
-1bacd91b2236d3e83ed14bd2511fb3a5d623bd35 0590cbb568a8493c3a63206dacfdc5cff1b80822 Athr Platform <athr@athr382.sa> 1788624271 +0100	commit: fix: Remove attendance_stats view to avoid schema compatibility issues
-0590cbb568a8493c3a63206dacfdc5cff1b80822 6bae459e80a276b43a5723ea835e0dadeafaad26 Athr Platform <athr@athr382.sa> 1788624390 +0100	commit: fix: Remove school_id column from attendance table
-6bae459e80a276b43a5723ea835e0dadeafaad26 f16d65bb3eede8aaab3d0877fd69bb838e94b292 Athr Platform <athr@athr382.sa> 1788624446 +0100	commit: fix: Correct parent attendance policy to use students.parent_id
-f16d65bb3eede8aaab3d0877fd69bb838e94b292 744b8c9be2593776ac3c8c24a78d12bd5c8b940b Athr Platform <athr@athr382.sa> 1790338821 +0100	filter-branch: rewrite
