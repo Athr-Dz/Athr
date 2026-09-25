@@ -66,16 +66,6 @@
       // Initialize data structures
       initData();
       
-      // Initialize auth
-      const user = await window.Auth.init();
-      if (user) {
-        STATE.user = user;
-        console.log('ℹ️ Active session found:', user.email, user.role);
-      } else {
-        console.log('ℹ️ No active session - showing login');
-      }
-      
-      // Handle current route
       try {
         // Initialize auth and check session
         const user = await Auth.init();
@@ -84,13 +74,13 @@
           console.log('✅ User authenticated:', user.name);
           STATE.user = user;
           
-          // Load data from Supabase
-          await loadDataFromSupabase();
+          // Load data in background (don't wait)
+          loadDataFromSupabase();
         } else {
           console.log('ℹ️ No active session - showing login');
         }
         
-        // Start router - now all view functions are defined
+        // Start router NOW - don't wait for data
         handleRoute();
         
         console.log('✅ App initialized successfully');
