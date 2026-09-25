@@ -5990,6 +5990,11 @@ document.addEventListener('input', (e) => {
 });
 
 document.addEventListener('submit', (e) => {
+  // Let login forms be handled by their own listener
+  if (e.target.matches('[data-form="real-login"]')) {
+    return; // Don't handle here
+  }
+  
   // Add Student
   const fAddStud = e.target.closest('[data-form="add-student"]');
   if (fAddStud) {
