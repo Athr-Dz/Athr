@@ -872,7 +872,7 @@ function highlightNav() {
 }
 
 /* --------------- NOT FOUND --------------- */
-function viewNotFound() {
+viewNotFound = function() {
   return `
     <div class="empty">
       <div class="ico">${I.search}</div>
@@ -1459,7 +1459,7 @@ const SPECIAL_ED_FORM_TYPES = [
   { key: 'studentNotes',       name: 'ملاحظة الطالبة',        sub: 'رفع ملف pdf — ملاحظات دورية عن الطالبة', icon: '📝', isPDF: true },
 ];
 
-function viewStudentProfile(id, role) {
+viewStudentProfile = function(id, role) {
   const st = studentBy(id);
   if (!st) return viewNotFound();
   const parent = userBy(st.parent_id); // Fixed: use parent_id instead of parentId
@@ -4598,7 +4598,7 @@ function viewProgressTeacher() {
 /* =========================================================
    SETTINGS
    ========================================================= */
-function viewSettings(role) {
+viewSettings = function(role) {
   const u = STATE.user;
   if (role !== 'teacher') return viewParentSettings();
   const params = new URLSearchParams((location.hash.split('?')[1]) || '');
