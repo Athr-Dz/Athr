@@ -919,6 +919,12 @@ function renderLogin() {
                 STATE.user = user;
                 await loadDataFromSupabase();
                 persistState();
+                
+                // Wait for app.js to fully load before navigating
+                if (document.readyState === 'loading') {
+                  await new Promise(resolve => document.addEventListener('DOMContentLoaded', resolve));
+                }
+                
                 if (user.role === 'student') {
                   STATE.user.studentId = user.id;
                   navigate('/parent/dashboard');
