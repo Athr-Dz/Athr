@@ -920,18 +920,16 @@ function renderLogin() {
                 await loadDataFromSupabase();
                 persistState();
                 
-                // Wait for app.js to fully load before navigating
-                if (document.readyState === 'loading') {
-                  await new Promise(resolve => document.addEventListener('DOMContentLoaded', resolve));
-                }
-                
-                if (user.role === 'student') {
-                  STATE.user.studentId = user.id;
-                  navigate('/parent/dashboard');
-                } else {
-                  navigate('/' + user.role + '/dashboard');
-                }
-                toast('مرحباً ' + user.name);
+                // Give app.js time to fully load all functions (simple delay)
+                setTimeout(() => {
+                  if (user.role === 'student') {
+                    STATE.user.studentId = user.id;
+                    navigate('/parent/dashboard');
+                  } else {
+                    navigate('/' + user.role + '/dashboard');
+                  }
+                  toast('مرحباً ' + user.name);
+                }, 500);
               })
               .catch((error) => {
                 console.error('Login error:', error);
