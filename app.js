@@ -657,42 +657,42 @@ async function handleRoute() {
   let view = '';
   if (role === 'principal') {
     view = ({
-      dashboard: viewPrincipalDashboard,
-      teachers:  viewPrincipalTeachers,
-      students:  viewPrincipalStudents,
+      dashboard: () => viewPrincipalDashboard(),
+      teachers:  () => viewPrincipalTeachers(),
+      students:  () => viewPrincipalStudents(),
       student:   () => viewStudentProfile(id, 'principal'),
-      ieps:      viewPrincipalIEPs,
-      reports:   viewPrincipalReports,
+      ieps:      () => viewPrincipalIEPs(),
+      reports:   () => viewPrincipalReports(),
       settings:  () => viewSettings('principal'),
     })[screen];
   } else if (role === 'teacher') {
     view = ({
-      dashboard: viewTeacherDashboard,
-      students:  viewTeacherStudents,
+      dashboard: () => viewTeacherDashboard(),
+      students:  () => viewTeacherStudents(),
       student:   () => viewStudentProfile(id, 'teacher'),
       plan:      () => viewPlan(id, 'teacher'),
       report:    () => viewStudentReport(id),
-      activities:viewActivities,
+      activities: () => viewActivities(),
       activity:  () => (id === 'new' ? viewActivityCreate() : viewActivityDetail(id, 'teacher')),
       review:    () => viewVideoReview(id),
       library:   () => viewLibrary('teacher'),
-      schedule:  viewScheduleEditor,
-      attendance:viewAttendance,
+      schedule:  () => viewScheduleEditor(),
+      attendance: () => viewAttendance(),
       progress:  () => viewProgressTeacher(),
       settings:  () => viewSettings('teacher'),
     })[screen];
   } else if (role === 'parent') {
     view = ({
-      dashboard: viewParentDashboard,
-      messages:  viewParentMessages,
+      dashboard: () => viewParentDashboard(),
+      messages:  () => viewParentMessages(),
       activity:  () => viewActivityDetail(id, 'parent'),
       report:    () => viewStudentReport(STATE.user.studentId),
       progress:  () => viewParentProgress(),
-      rewards:   viewParentRewards,
+      rewards:   () => viewParentRewards(),
       library:   () => viewLibrary('parent'),
       settings:  () => viewSettings('parent'),
       form:      () => viewParentForm(id),
-      iep:       viewParentIEP,
+      iep:       () => viewParentIEP(),
     })[screen];
   }
 
