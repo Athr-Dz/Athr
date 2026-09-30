@@ -54,6 +54,8 @@ const I = (() => {
     back:    s('<path d="M19 12H5M12 5l-7 7 7 7"/>'),
     forward: s('<path d="M5 12h14M12 19l7-7-7-7"/>'),
     medal:   s('<circle cx="12" cy="8" r="6"/><path d="M9 14l-1.5 7L12 18l4.5 3-1.5-7"/>'),
+    chevronD:s('<path d="M6 9l6 6 6-6"/>'),
+    grid:    s('<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>'),
   };
 })();
 
@@ -5211,6 +5213,17 @@ document.addEventListener('click', async (e) => {
       viewIEPPDF(sid);
       return;
     }
+    if (a === 'print-special-ed-iep') {
+      const sid = action.getAttribute('data-sid');
+      const st = studentBy(sid);
+      if (!st) return;
+      const iep = st.special_ed_iep;
+      if (!iep) { toast('لا توجد خطة للطباعة', 'warn'); return; }
+      const printWindow = window.open('', '_blank');
+      printWindow.document.write(`<!DOCTYPE html><html dir="rtl"><head><meta charset="UTF-8"><title>الخطة التربوية - ${st.name}</title><style>body{font-family:sans-serif;padding:40px;line-height:1.8}h1{text-align:center;color:#6E5BC7}table{width:100%;border-collapse:collapse}td,th{border:1px solid #ccc;padding:8px}@media print{body{padding:20px}}</style></head><body><h1>الخطة التربوية الفردية</h1><p><strong>اسم الطالبة:</strong> ${esc(st.name)}</p><p><strong>الصف:</strong> ${esc(st.grade)}</p><p><strong>المستوى الحالي:</strong> ${esc(iep.current_level || '')}</p><h2>الأهداف الفصلية</h2>${(iep.semester_goals||[]).map((g,i)=>`<p>${i+1}. ${esc(g.text)}</p>`).join('')}<h2>الأهداف قصيرة المدى</h2>${(iep.short_term_goals||[]).map((g,i)=>`<p>${i+1}. ${esc(g.text)}</p>`).join('')}<script>window.onload=()=>window.print();<\/script></body></html>`);
+      printWindow.document.close();
+      return;
+    }
     if (a === 'add-special-ed-session') {
       const sid = action.getAttribute('data-sid');
       openSpecialEdSessionModal(sid);
@@ -5226,11 +5239,6 @@ document.addEventListener('click', async (e) => {
       const sid = action.getAttribute('data-sid');
       const idx = parseInt(action.getAttribute('data-idx'));
       openSpecialEdSessionModal(sid, idx);
-      return;
-    }
-    if (a === 'add-session') {
-      const sid = action.getAttribute('data-sid');
-      openAddSessionModal(sid);
       return;
     }
     if (a === 'regen-plan' || a === 'generate-plan-from-assessment') {
