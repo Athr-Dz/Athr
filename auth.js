@@ -13,35 +13,36 @@ const Auth = {
       return null;
     }
 
-    const { data: { session } } = await window.supabaseClient.auth.getSession();
-    if (session) {
+    try {
+      const { data: { session } } = await window.supabaseClient.auth.getSession();
+      if (!session) return null;
+
       // Try users table first (principal/teacher/parent)
       const { data: userProfile } = await window.supabaseClient
         .from('users')
         .select('*')
         .eq('auth_id', session.user.id)
-        .single();
+        .maybeSingle();
       
       if (userProfile) {
         this.currentUser = userProfile;
         return userProfile;
       }
 
-      // Try students table using admin client (bypass RLS)
+      // Try students table
       const { data: studentProfile } = await window.supabaseAdmin
         .from('students')
         .select('*')
         .eq('auth_id', session.user.id)
-        .single();
+        .maybeSingle();
       
       if (studentProfile) {
-        const profile = {
-          ...studentProfile,
-          role: 'student',
-        };
+        const profile = { ...studentProfile, role: 'student' };
         this.currentUser = profile;
         return profile;
       }
+    } catch (err) {
+      console.error('Auth init error:', err);
     }
     return null;
   },

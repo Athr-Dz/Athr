@@ -51,6 +51,8 @@ const I = (() => {
     trash:   s('<path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>'),
     close:   s('<path d="M18 6L6 18M6 6l12 12"/>'),
     chevron: s('<path d="M9 18l6-6-6-6"/>'),
+    back:    s('<path d="M19 12H5M12 5l-7 7 7 7"/>'),
+    forward: s('<path d="M5 12h14M12 19l7-7-7-7"/>'),
   };
 })();
 
