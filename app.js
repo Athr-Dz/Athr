@@ -57,11 +57,11 @@ const I = (() => {
 /* --------------- STATE --------------- */
 const STORAGE_KEY = 'athr-state-v7';
 
-// Forward declarations for principal views (real implementations are later in file)
-let viewPrincipalDashboard, viewPrincipalTeachers, viewPrincipalStudents, viewPrincipalIEPs, viewPrincipalReports;
-
-// Also declare other view functions that are used early
-let viewSettings, viewNotFound, viewStudentProfile;
+// Forward declarations for functions defined later in the file
+var viewPrincipalDashboard, viewPrincipalTeachers, viewPrincipalStudents, viewPrincipalIEPs, viewPrincipalReports;
+var viewSettings, viewNotFound, viewStudentProfile;
+var setupTypingIndicator, openMemoryTestModal, viewMemoryTestModal;
+var openInitialReportModal, viewInitialReportModal, printInitialReport;
 
 function arNum(n) {
   // Use Latin (Western Arabic) numerals — cleaner with the editorial typography
@@ -657,42 +657,42 @@ async function handleRoute() {
   let view = '';
   if (role === 'principal') {
     view = ({
-      dashboard: () => viewPrincipalDashboard(),
-      teachers:  () => viewPrincipalTeachers(),
-      students:  () => viewPrincipalStudents(),
+      dashboard: viewPrincipalDashboard,
+      teachers:  viewPrincipalTeachers,
+      students:  viewPrincipalStudents,
       student:   () => viewStudentProfile(id, 'principal'),
-      ieps:      () => viewPrincipalIEPs(),
-      reports:   () => viewPrincipalReports(),
+      ieps:      viewPrincipalIEPs,
+      reports:   viewPrincipalReports,
       settings:  () => viewSettings('principal'),
     })[screen];
   } else if (role === 'teacher') {
     view = ({
-      dashboard: () => viewTeacherDashboard(),
-      students:  () => viewTeacherStudents(),
+      dashboard: viewTeacherDashboard,
+      students:  viewTeacherStudents,
       student:   () => viewStudentProfile(id, 'teacher'),
       plan:      () => viewPlan(id, 'teacher'),
       report:    () => viewStudentReport(id),
-      activities: () => viewActivities(),
+      activities:viewActivities,
       activity:  () => (id === 'new' ? viewActivityCreate() : viewActivityDetail(id, 'teacher')),
       review:    () => viewVideoReview(id),
       library:   () => viewLibrary('teacher'),
-      schedule:  () => viewScheduleEditor(),
-      attendance: () => viewAttendance(),
+      schedule:  viewScheduleEditor,
+      attendance:viewAttendance,
       progress:  () => viewProgressTeacher(),
       settings:  () => viewSettings('teacher'),
     })[screen];
   } else if (role === 'parent') {
     view = ({
-      dashboard: () => viewParentDashboard(),
-      messages:  () => viewParentMessages(),
+      dashboard: viewParentDashboard,
+      messages:  viewParentMessages,
       activity:  () => viewActivityDetail(id, 'parent'),
       report:    () => viewStudentReport(STATE.user.studentId),
       progress:  () => viewParentProgress(),
-      rewards:   () => viewParentRewards(),
+      rewards:   viewParentRewards,
       library:   () => viewLibrary('parent'),
       settings:  () => viewSettings('parent'),
       form:      () => viewParentForm(id),
-      iep:       () => viewParentIEP(),
+      iep:       viewParentIEP,
     })[screen];
   }
 
@@ -776,6 +776,9 @@ function renderTopBar() {
       <button class="icon-btn" data-action="open-notifications" aria-label="الإشعارات">
         ${I.bell}
         ${unread ? `<span class="dot"></span>` : ''}
+      </button>
+      <button class="icon-btn" data-action="logout" aria-label="تسجيل الخروج" title="تسجيل الخروج" style="color:var(--critical)">
+        ${I.logout}
       </button>
     </header>
   `;
@@ -872,7 +875,7 @@ function highlightNav() {
 }
 
 /* --------------- NOT FOUND --------------- */
-viewNotFound = function() {
+function viewNotFound() {
   return `
     <div class="empty">
       <div class="ico">${I.search}</div>
@@ -910,48 +913,7 @@ function renderLogin() {
             <input name="password" type="password" required placeholder="••••••••" autocomplete="current-password">
           </div>
 
-          <button type="button" class="btn lg block" onclick="
-            const form = this.closest('form');
-            const btn = this;
-            const originalText = btn.innerHTML;
-            btn.disabled = true;
-            btn.innerHTML = '<span>جاري تسجيل الدخول...</span>';
-            
-            // Make sure STATE.data exists
-            if (!STATE.data) initData();
-            
-            Auth.loginWithEmail(form.email.value, form.password.value)
-              .then(async (user) => {
-                STATE.user = user;
-                await loadDataFromSupabase();
-                persistState();
-                
-                // Give app.js time to fully load all functions (simple delay)
-                setTimeout(() => {
-                  if (user.role === 'student') {
-                    STATE.user.studentId = user.id;
-                    navigate('/parent/dashboard');
-                  } else {
-                    navigate('/' + user.role + '/dashboard');
-                  }
-                  toast('مرحباً ' + user.name);
-                }, 500);
-              })
-              .catch((error) => {
-                console.error('Login error:', error);
-                let msg = 'خطأ في تسجيل الدخول';
-                if (error.message && error.message.includes('Invalid login credentials')) {
-                  msg = 'البريد الإلكتروني أو كلمة المرور غير صحيحة';
-                } else if (error.message && error.message.includes('لم يتم العثور على ملف المستخدم')) {
-                  msg = 'تم تسجيل الدخول بنجاح، لكن لم يتم العثور على حساب. شغّل ملف FIX-PRINCIPAL-SIMPLE.sql في Supabase';
-                } else if (error.message) {
-                  msg = error.message;
-                }
-                toast(msg, 'error');
-                btn.disabled = false;
-                btn.innerHTML = originalText;
-              });
-          ">
+          <button type="submit" class="btn lg block">
             ${I.check}<span>دخول</span>
           </button>
 
@@ -1459,7 +1421,7 @@ const SPECIAL_ED_FORM_TYPES = [
   { key: 'studentNotes',       name: 'ملاحظة الطالبة',        sub: 'رفع ملف pdf — ملاحظات دورية عن الطالبة', icon: '📝', isPDF: true },
 ];
 
-viewStudentProfile = function(id, role) {
+function viewStudentProfile(id, role) {
   const st = studentBy(id);
   if (!st) return viewNotFound();
   const parent = userBy(st.parent_id); // Fixed: use parent_id instead of parentId
@@ -2537,10 +2499,10 @@ function renderMemoryTestTab(st) {
       
       <div class="grid cols-2 mb-md">
         <button class="btn lg" data-action="add-memory-test" data-sid="${st.id}" data-type="1">
-          <span>📝 النموذج الأول</span>
+          <span>🔢 الذاكرة السمعية للأرقام</span>
         </button>
         <button class="btn lg" data-action="add-memory-test" data-sid="${st.id}" data-type="2">
-          <span>📝 النموذج الثاني</span>
+          <span>📝 الذاكرة السمعية للكلمات</span>
         </button>
       </div>
 
@@ -4598,7 +4560,7 @@ function viewProgressTeacher() {
 /* =========================================================
    SETTINGS
    ========================================================= */
-viewSettings = function(role) {
+function viewSettings(role) {
   const u = STATE.user;
   if (role !== 'teacher') return viewParentSettings();
   const params = new URLSearchParams((location.hash.split('?')[1]) || '');
@@ -6037,11 +5999,6 @@ document.addEventListener('input', (e) => {
 });
 
 document.addEventListener('submit', (e) => {
-  // Let login forms be handled by their own listener
-  if (e.target.matches('[data-form="real-login"]')) {
-    return; // Don't handle here
-  }
-  
   // Add Student
   const fAddStud = e.target.closest('[data-form="add-student"]');
   if (fAddStud) {
@@ -6922,25 +6879,22 @@ document.addEventListener('submit', (e) => {
     const tools = Array.from(fAddFollowup.querySelectorAll('input[name="tools"]:checked'))
       .map(cb => cb.value);
     
-    // Get plan goals (multiple)
-    const planGoalIds = fd.getAll('plan_goal_id[]').filter(v => v);
-    const planGoalCategories = fd.getAll('plan_goal_category[]');
-    const planGoals = planGoalIds.map((id, idx) => ({
-      goal_id: id,
-      category: planGoalCategories[idx] || '',
-      evaluation: fd.get(`plan_goal_eval_goal-${idx}`) || ''
-    }));
-    
     const followupData = {
       id: 'fup-' + Date.now(),
       studentId: sid,
       teacher_id: STATE.user.id,
       date_from: fd.get('date_from'),
       date_to: fd.get('date_to'),
-      plan_goals: planGoals, // Array of goals from IEP
-      custom_goal: fd.get('custom_goal') || null,
-      custom_goal_category: fd.get('custom_goal_category') || null,
-      custom_goal_evaluation: fd.get('custom_goal_evaluation') || null,
+      goal_1_id: fd.get('goal_1_id') || null,
+      goal_1_evaluation: fd.get('goal_1_evaluation') || null,
+      goal_2_id: fd.get('goal_2_id') || null,
+      goal_2_evaluation: fd.get('goal_2_evaluation') || null,
+      custom_goal_1: fd.get('custom_goal_1') || null,
+      custom_goal_1_type: fd.get('custom_goal_1_type') || null,
+      custom_goal_1_evaluation: fd.get('custom_goal_1_evaluation') || null,
+      custom_goal_2: fd.get('custom_goal_2') || null,
+      custom_goal_2_type: fd.get('custom_goal_2_type') || null,
+      custom_goal_2_evaluation: fd.get('custom_goal_2_evaluation') || null,
       tools: tools,
       notes: fd.get('notes') || '',
       created_at: new Date().toISOString(),
@@ -6950,17 +6904,23 @@ document.addEventListener('submit', (e) => {
     // Save to Supabase
     (async () => {
       try {
-        const { data, error} = await window.supabaseClient
+        const { data, error } = await window.supabaseClient
           .from('student_followups')
           .insert({
             student_id: sid,
             teacher_id: STATE.user.id,
             date_from: followupData.date_from,
             date_to: followupData.date_to,
-            plan_goals: JSON.stringify(planGoals),
-            custom_goal: followupData.custom_goal,
-            custom_goal_category: followupData.custom_goal_category,
-            custom_goal_evaluation: followupData.custom_goal_evaluation,
+            goal_1_id: followupData.goal_1_id,
+            goal_1_evaluation: followupData.goal_1_evaluation,
+            goal_2_id: followupData.goal_2_id,
+            goal_2_evaluation: followupData.goal_2_evaluation,
+            custom_goal_1: followupData.custom_goal_1,
+            custom_goal_1_type: followupData.custom_goal_1_type,
+            custom_goal_1_evaluation: followupData.custom_goal_1_evaluation,
+            custom_goal_2: followupData.custom_goal_2,
+            custom_goal_2_type: followupData.custom_goal_2_type,
+            custom_goal_2_evaluation: followupData.custom_goal_2_evaluation,
             tools: JSON.stringify(tools),
             notes: followupData.notes
           })
@@ -7647,16 +7607,17 @@ const PRE_ASSESSMENT_SECTIONS = [
     num: 3,
     title: 'تقييم (غير رسمي) للمهارات اللغوية',
     cols: ['متقن','متقن جزئياً','غير متقن'],
-    note: 'الحالة تُظهر تنغيمة',
+    note: 'الحالة تُظهر تنغيماً',
     questions: [
-      { id: 'inf_tone', label: 'الحالة تُظهر تنغيمة', type: 'eval3' },
+      { id: 'inf_tone', label: 'الحالة تُظهر تنغيماً', type: 'eval3' },
       { id: 'inf_play_skills', label: 'مهارات اللعب', type: 'text', placeholder: 'ملاحظات' },
       { id: 'inf_gestures', label: 'استخدام الإشارات أو الإيماءات', type: 'eval3' },
       { id: 'inf_receptive_nonverbal', label: 'الاستجابة الغير لفظية للمحفز اللفظي', type: 'eval3' },
-      { id: 'inf_voluntary_sounds', label: 'اختيار إصدار كلمات أو أصوات عفوية', type: 'eval3' },
+      { id: 'inf_voluntary_sounds', label: 'احتمال إصدار كلمات أو أصوات عفوية', type: 'eval3' },
       { id: 'inf_intentional_comm', label: 'التواصل المقصود', type: 'eval3' },
-      { id: 'inf_imitation_skills', label: 'مهارة تقليد الأفعال', type: 'eval3' },
+      { id: 'inf_imitation_skills', label: 'مهارة تبادل الأدوار', type: 'eval3' },
       { id: 'inf_limited_lang_note', label: 'إذا كانت الحالة محدودة اللغة (في هذا المستوى الحالة تستخدم كلمة واحدة فقط) تقييم المهارات السابقة بالإضافة إلى', type: 'header' },
+      { id: 'inf_greeting_response', label: 'الاستجابة للتحية', type: 'eval3' },
       { id: 'inf_request_situations', label: 'الطلب من خلال استخدامات موقف أو فرصة للطلب', type: 'eval3' },
       { id: 'inf_label_familiar', label: 'تسمية الأدوات المألوفة أو الإشارة', type: 'eval3' },
       { id: 'inf_simple_syllables', label: 'استخدام المقاطع البسيطة', type: 'eval3' },
@@ -7664,6 +7625,7 @@ const PRE_ASSESSMENT_SECTIONS = [
       { id: 'inf_limited_words_note', label: 'إذا كانت الحالة تستخدم كلمات محدودة، تقييم المهارات السابقة بالإضافة إلى', type: 'header' },
       { id: 'inf_body_parts', label: 'تسمية أجزاء الجسم', type: 'eval3' },
       { id: 'inf_familiar_nouns', label: 'تسمية الأسماء المألوفة', type: 'eval3' },
+      { id: 'inf_familiar_fruits', label: 'تسمية الفواكه المألوفة', type: 'eval3' },
       { id: 'inf_familiar_vegetables', label: 'تسمية الخضروات المألوفة', type: 'eval3' },
       { id: 'inf_familiar_animals', label: 'تسمية الحيوانات المألوفة', type: 'eval3' },
       { id: 'inf_primary_colors', label: 'تسمية الألوان الرئيسية', type: 'eval3' },
@@ -9545,7 +9507,7 @@ function generateLanguageGoals(weakPoints) {
   // Create a mapping from assessment IDs to short-term goal text
   const goalMapping = {
     // Attention & Focus
-    'inf_tone': 'أن تُظهر الطالبة تنغيمة مناسبة عند التواصل بنسبة 80%',
+    'inf_tone': 'أن تُظهر الطالبة تنغيماً مناسباً عند التواصل بنسبة 80%',
     'inf_intentional_comm': 'أن تستخدم الطالبة التواصل المقصود بشكل صحيح بنسبة 80%',
     'inf_maintain_topic': 'أن تحافظ الطالبة على الموضوع أثناء الحديث بنسبة 80%',
     
@@ -10519,158 +10481,159 @@ function openAddFollowupModal(sid) {
   const st = studentBy(sid);
   const plan = STATE.data.plans.find(p => p.studentId === sid);
   const today = new Date().toISOString().slice(0, 10);
-  
   const planGoals = plan?.goals || [];
-  
+
+  // Get week start/end (Sunday to Thursday)
+  const now = new Date();
+  const day = now.getDay();
+  const sunday = new Date(now); sunday.setDate(now.getDate() - day);
+  const thursday = new Date(sunday); thursday.setDate(sunday.getDate() + 4);
+  const weekFrom = sunday.toISOString().slice(0,10);
+  const weekTo = thursday.toISOString().slice(0,10);
+
+  const toolsList = ['بطاقات', 'مجسمات', 'ألعاب', 'جهاز', 'لوحي', 'أوراق عمل', 'مرآة', 'أخرى', 'عرض مرئي', 'بازل', 'سبورة', 'سبورة ذكية'];
+
+  const goalsHTML = planGoals.length === 0 ? `
+    <div class="text-sm text-muted" style="padding:8px">لا توجد أهداف في الخطة الفردية</div>
+  ` : planGoals.map((g, i) => `
+    <label class="row" style="gap:10px;align-items:flex-start;padding:8px;border-radius:8px;cursor:pointer;border:1px solid var(--hair);margin-bottom:6px">
+      <input type="checkbox" name="selected_goals" value="${i}" style="margin-top:3px;flex-shrink:0">
+      <div>
+        <div class="text-bold text-sm">${esc(g.text || g.goal || g)}</div>
+        ${g.subGoal ? `<div class="text-xs text-muted">${esc(g.subGoal)}</div>` : ''}
+      </div>
+    </label>
+  `).join('');
+
+  const tableRowsHTML = planGoals.map((g, i) => `
+    <tr class="followup-goal-row" data-goal-idx="${i}" style="display:none">
+      <td style="padding:8px;vertical-align:top;min-width:160px">
+        <div class="text-bold text-sm">${esc(g.text || g.goal || g)}</div>
+        ${g.subGoal ? `<div class="text-xs text-muted mt-xs">${esc(g.subGoal)}</div>` : ''}
+        <div class="mt-xs">
+          <input type="text" name="goal_${i}_short_term" placeholder="الهدف قصير المدى..." style="font-size:12px;padding:4px 8px;width:100%">
+          <div style="display:flex;gap:6px;margin-top:4px">
+            <input type="date" name="goal_${i}_date_from" value="${weekFrom}" style="font-size:11px;padding:3px;flex:1">
+            <span style="align-self:center">—</span>
+            <input type="date" name="goal_${i}_date_to" value="${weekTo}" style="font-size:11px;padding:3px;flex:1">
+          </div>
+        </div>
+      </td>
+      <td style="padding:8px;vertical-align:top;min-width:160px">
+        <textarea name="goal_${i}_teaching_goals" rows="3" placeholder="الأهداف التدريسية..." style="width:100%;font-size:12px;padding:4px 8px;resize:vertical"></textarea>
+      </td>
+      <td style="padding:8px;vertical-align:top">
+        <div style="display:flex;flex-direction:column;gap:4px">
+          ${toolsList.map(t => `
+            <label style="display:flex;gap:6px;align-items:center;font-size:12px;cursor:pointer">
+              <input type="checkbox" name="goal_${i}_tools" value="${t}">
+              ${t}
+            </label>
+          `).join('')}
+        </div>
+      </td>
+      <td style="padding:8px;vertical-align:top">
+        <select name="goal_${i}_reinforcement" style="font-size:12px;padding:4px;width:100%">
+          <option value="لفظي">لفظي</option>
+          <option value="مادي">مادي</option>
+          <option value="اجتماعي">اجتماعي</option>
+          <option value="رمزي">رمزي</option>
+        </select>
+      </td>
+      <td style="padding:8px;vertical-align:top">
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <label style="font-size:11px;color:var(--text-muted)">الأحد</label>
+          <input type="date" name="goal_${i}_week_sun" style="font-size:11px;padding:3px">
+          <label style="font-size:11px;color:var(--text-muted)">الاثنين</label>
+          <input type="date" name="goal_${i}_week_mon" style="font-size:11px;padding:3px">
+        </div>
+      </td>
+      <td style="padding:8px;vertical-align:top">
+        <select name="goal_${i}_evaluation" style="font-size:12px;padding:4px;width:100%">
+          <option value="مستمر">مستمر</option>
+          <option value="أتقن">أتقن</option>
+          <option value="جزئياً">جزئياً</option>
+          <option value="لم يتقن">لم يتقن</option>
+          <option value="قيد التدريب">قيد التدريب</option>
+        </select>
+      </td>
+    </tr>
+  `).join('');
+
   openModal(`
     <div class="modal-head">
-      <h2>📈 إضافة متابعة لـ ${esc(st.name)}</h2>
+      <h2>📈 استمارة متابعة الأهداف — ${esc(st.name)}</h2>
       <button class="x" data-action="close-modal">${I.close}</button>
     </div>
     <form data-form="add-followup" data-sid="${sid}">
-      <!-- فترة المتابعة -->
-      <div class="field-group">
-        <label class="section-label">📅 فترة المتابعة</label>
-        <div class="row" style="gap:12px">
-          <div class="field" style="flex:1">
-            <label>من</label>
-            <input name="date_from" type="date" value="${today}" required>
-          </div>
-          <div class="field" style="flex:1">
-            <label>إلى</label>
-            <input name="date_to" type="date" value="${today}" required>
-          </div>
+
+      <!-- معلومات الطالبة -->
+      <div class="row" style="gap:12px;margin-bottom:16px;padding:12px;background:var(--canvas);border-radius:10px">
+        <div style="flex:1"><span class="text-muted text-sm">اسم الطالبة: </span><strong>${esc(st.name)}</strong></div>
+        <div style="flex:1"><span class="text-muted text-sm">الصف: </span><strong>${esc(st.grade || '')}</strong></div>
+        <div style="flex:1">
+          <span class="text-muted text-sm">أسبوع المتابعة: </span>
+          <input type="date" name="date_from" value="${weekFrom}" style="font-size:12px;padding:3px"> — 
+          <input type="date" name="date_to" value="${weekTo}" style="font-size:12px;padding:3px">
         </div>
       </div>
 
-      <!-- اختيار الأهداف من الخطة -->
-      <div class="field-group">
-        <label class="section-label">🎯 الأهداف من الخطة الفردية</label>
-        <div id="plan-goals-container"></div>
-        <button type="button" class="btn soft sm" data-action="add-plan-goal-field">
-          ${I.plus}<span>إضافة هدف من الخطة</span>
-        </button>
-      </div>
-
-      <!-- هدف يدوي واحد (اختياري) -->
-      <div class="field-group">
-        <label class="section-label">✍️ هدف يدوي (اختياري)</label>
-        <div class="text-xs text-muted mb-sm">يمكنك إضافة هدف واحد فقط يدوياً عند الحاجة</div>
-        <div class="field">
-          <label>اكتب الهدف</label>
-          <textarea name="custom_goal" rows="2" placeholder="مثال: أن تنطق الطالبة حرف الراء بوضوح..."></textarea>
-        </div>
-        <div class="field">
-          <label>تصنيف الهدف</label>
-          <select name="custom_goal_category">
-            <option value="">-- اختر التصنيف --</option>
-            <option value="تمهيدي">هدف تمهيدي</option>
-            <option value="استقبالي">هدف استقبالي</option>
-            <option value="تعبيري">هدف تعبيري</option>
-            <option value="نطق">هدف نطق</option>
-          </select>
-        </div>
-        <div class="field">
-          <label>تقييم الهدف</label>
-          <div class="row" style="gap:8px">
-            <label class="radio-chip">
-              <input type="radio" name="custom_goal_evaluation" value="mastered" hidden>
-              <span>أتقن</span>
-            </label>
-            <label class="radio-chip">
-              <input type="radio" name="custom_goal_evaluation" value="partial" hidden>
-              <span>جزئياً</span>
-            </label>
-            <label class="radio-chip">
-              <input type="radio" name="custom_goal_evaluation" value="not_mastered" hidden>
-              <span>لم يتقن</span>
-            </label>
-          </div>
+      <!-- اختيار الأهداف -->
+      <div class="card mb-md" style="padding:12px">
+        <div class="text-bold mb-sm">▼ بك أهداف الخطة (${planGoals.length} داخل الاستمارة)</div>
+        <div style="max-height:200px;overflow-y:auto">
+          ${goalsHTML}
         </div>
       </div>
 
-      <!-- الوسائل المستخدمة -->
-      <div class="field-group">
-        <label class="section-label">🛠️ الوسائل المستخدمة</label>
-        <div class="checkbox-group">
-          <label class="checkbox-label"><input type="checkbox" name="tools" value="بطاقات صور"> بطاقات صور</label>
-          <label class="checkbox-label"><input type="checkbox" name="tools" value="قصص"> قصص</label>
-          <label class="checkbox-label"><input type="checkbox" name="tools" value="سبورة"> سبورة</label>
-          <label class="checkbox-label"><input type="checkbox" name="tools" value="مجسمات"> مجسمات</label>
-          <label class="checkbox-label"><input type="checkbox" name="tools" value="آيباد"> آيباد</label>
-          <label class="checkbox-label"><input type="checkbox" name="tools" value="مرآة"> مرآة</label>
-          <label class="checkbox-label"><input type="checkbox" name="tools" value="العاب تركيز وانتباه"> العاب تركيز وانتباه</label>
-        </div>
+      <!-- جدول الاستمارة -->
+      <div style="overflow-x:auto;margin-bottom:16px">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;min-width:700px">
+          <thead>
+            <tr style="background:var(--blue);color:white;text-align:center">
+              <th style="padding:10px;min-width:160px">الهدف قصر المدى + تاريخ الهدف</th>
+              <th style="padding:10px;min-width:160px">الأهداف التدريسية</th>
+              <th style="padding:10px;min-width:120px">الوسائل المستخدمة</th>
+              <th style="padding:10px;min-width:80px">التعزيز</th>
+              <th style="padding:10px;min-width:100px">الأسبوع</th>
+              <th style="padding:10px;min-width:80px">التقييم</th>
+            </tr>
+          </thead>
+          <tbody id="followup-goals-table">
+            ${tableRowsHTML}
+            <tr id="followup-empty-row">
+              <td colspan="6" style="text-align:center;padding:20px;color:var(--text-muted)">اختاري الأهداف من فوق لتظهر هنا</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
 
       <!-- ملاحظات -->
       <div class="field">
         <label>ملاحظات (اختياري)</label>
-        <textarea name="notes" rows="3" placeholder="أضف ملاحظات عن المتابعة..."></textarea>
+        <textarea name="notes" rows="2" placeholder="أضف ملاحظات..."></textarea>
       </div>
 
-      <button type="submit" class="btn lg block">${I.check}<span>حفظ المتابعة</span></button>
+      <div class="row" style="gap:12px;margin-top:16px">
+        <button type="submit" class="btn lg" style="flex:1">${I.check}<span>حفظ المتابعة</span></button>
+      </div>
     </form>
-  `, { lg: true });
 
-  // Initialize with one goal field
-  let goalFieldIndex = 0;
-  
-  function addPlanGoalField() {
-    const container = document.getElementById('plan-goals-container');
-    const fieldId = `goal-${goalFieldIndex++}`;
-    
-    const fieldHtml = `
-      <div class="field-card" id="${fieldId}" style="padding:16px;background:var(--canvas);border-radius:12px;margin-bottom:12px;position:relative">
-        <button type="button" class="btn danger-soft sm" style="position:absolute;top:8px;right:8px" onclick="document.getElementById('${fieldId}').remove()">
-          ${I.trash}
-        </button>
-        <div class="field">
-          <label>اختر الهدف</label>
-          <select name="plan_goal_id[]" required>
-            <option value="">-- اختر هدف من الخطة --</option>
-            ${planGoals.map(g => `<option value="${g.id}">${esc(g.text || g.goal || g)}</option>`).join('')}
-          </select>
-        </div>
-        <div class="field">
-          <label>تصنيف الهدف</label>
-          <select name="plan_goal_category[]" required>
-            <option value="">-- اختر التصنيف --</option>
-            <option value="تمهيدي">هدف تمهيدي</option>
-            <option value="استقبالي">هدف استقبالي</option>
-            <option value="تعبيري">هدف تعبيري</option>
-            <option value="نطق">هدف نطق</option>
-          </select>
-        </div>
-        <div class="field">
-          <label>تقييم الهدف</label>
-          <div class="row" style="gap:8px">
-            <label class="radio-chip">
-              <input type="radio" name="plan_goal_eval_${fieldId}" value="mastered" hidden>
-              <span>أتقن</span>
-            </label>
-            <label class="radio-chip">
-              <input type="radio" name="plan_goal_eval_${fieldId}" value="partial" hidden>
-              <span>جزئياً</span>
-            </label>
-            <label class="radio-chip">
-              <input type="radio" name="plan_goal_eval_${fieldId}" value="not_mastered" hidden>
-              <span>لم يتقن</span>
-            </label>
-          </div>
-        </div>
-      </div>
-    `;
-    
-    container.insertAdjacentHTML('beforeend', fieldHtml);
-  }
-  
-  // Add button listener
-  setTimeout(() => {
-    document.querySelector('[data-action="add-plan-goal-field"]')?.addEventListener('click', addPlanGoalField);
-    // Add first goal field by default
-    addPlanGoalField();
-  }, 100);
+    <script>
+      // Show/hide table rows based on checkbox selection
+      document.querySelectorAll('[name="selected_goals"]').forEach(cb => {
+        cb.addEventListener('change', function() {
+          const idx = this.value;
+          const row = document.querySelector('.followup-goal-row[data-goal-idx="' + idx + '"]');
+          const emptyRow = document.getElementById('followup-empty-row');
+          if (row) row.style.display = this.checked ? '' : 'none';
+          const anyChecked = document.querySelectorAll('[name="selected_goals"]:checked').length > 0;
+          if (emptyRow) emptyRow.style.display = anyChecked ? 'none' : '';
+        });
+      });
+    </script>
+  `, { lg: true });
+}
 
 function openEditFollowupModal(id) {
   const followup = STATE.data.studentFollowups.find(f => f.id === id);
@@ -10767,48 +10730,166 @@ function openEditFollowupModal(id) {
 }
 
 // 2️⃣ اختبار الذاكرة السمعية - Modal
-function openMemoryTestModal(sid, testType) {
+openMemoryTestModal = function(sid, testType) {
   const st = studentBy(sid);
   const today = new Date().toISOString().slice(0, 10);
-  
-  // Placeholder for actual test data (will be added later)
-  const testTitle = testType === 1 ? 'النموذج الأول' : 'النموذج الثاني';
-  
-  openModal(`
-    <div class="modal-head">
-      <h2>🧠 ${testTitle} - ${esc(st.name)}</h2>
-      <button class="x" data-action="close-modal">${I.close}</button>
-    </div>
-    <form data-form="add-memory-test" data-sid="${sid}" data-type="${testType}">
-      <div class="alert info mb-md">
-        <p><strong>ملاحظة:</strong> سيتم إضافة نماذج الاختبارات لاحقاً من قبل إدارة المدرسة.</p>
-      </div>
 
-      <div class="field">
-        <label>تاريخ الاختبار</label>
-        <input name="tested_at" type="date" value="${today}" required>
-      </div>
+  if (testType === 1) {
+    // الذاكرة السمعية للأرقام
+    const sections = [
+      { num: 1, age: '(2 - 6 سنوات)', items: ['4 - 7', '6- 3', '5 - 8'] },
+      { num: 2, age: '(3 سنوات)', items: ['1-4-6', '2-5-3', '7-3-8'] },
+      { num: 3, age: '(6-4 سنوات)', items: ['9-2-7-4', '2-5-8-3', '1-6-2-7'] },
+      { num: 4, age: '(7 سنوات)', items: ['7- 5-8-1-3', '2-7-3-8-4', '3-8-1-6-9'] },
+      { num: 5, age: '(10 سنوات)', items: ['9-5-8-3-7-4', '6-4-7-9-2-5', '4-9-3-8-2-2'] },
+      { num: 6, age: '(15 سنة)', items: ['7-3-5-6-2-9-4', '6-2-8-1-5-3-9', '5-8-3-9-4-7-2'] },
+      { num: 7, age: '(الكبار البالغين * 1)', items: ['6-3-8-4-9-5-2-7', '4-2-6-9-3-5-1-7', '7-6-2-8-5-3-9-1'] },
+      { num: 8, age: '(الكبار البالغين * 2)', items: ['4-7-2-8-3-1-6-9-5', '6-3-7-1-4-8-5-2-9', '3 - 5- 8 − 6 − 1 − 9 − 2 − 7 − 4'] },
+    ];
 
-      <div class="field">
-        <label>النتيجة</label>
-        <div class="row" style="gap:12px">
-          <input name="score" type="number" min="0" placeholder="النتيجة" required style="flex:1">
-          <span style="align-self:center;font-weight:bold">/</span>
-          <input name="total_score" type="number" min="1" placeholder="من" required style="flex:1">
+    openModal(`
+      <div class="modal-head">
+        <h2>🧠 الذاكرة السمعية للأرقام — ${esc(st.name)}</h2>
+        <button class="x" data-action="close-modal">${I.close}</button>
+      </div>
+      <form data-form="add-memory-test" data-sid="${sid}" data-type="1">
+        
+        <!-- Header Info -->
+        <div style="border:2px solid #333;margin-bottom:16px">
+          <div style="background:#1a1a6e;color:white;text-align:center;padding:10px;font-size:18px;font-weight:bold">
+            الذاكرة السمعية للأرقام
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;border-top:1px solid #333">
+            <div style="padding:8px;border-left:1px solid #333">
+              <span class="text-muted text-sm">الاسم: </span>
+              <strong>${esc(st.name)}</strong>
+            </div>
+            <div style="padding:8px;border-left:1px solid #333">
+              <span class="text-muted text-sm">التاريخ: </span>
+              <input type="date" name="tested_at" value="${today}" style="border:none;font-size:13px">
+            </div>
+            <div style="padding:8px">
+              <span class="text-muted text-sm">أخصائية/ معلمة النطق: </span>
+              <strong>${esc(STATE.user?.name || '')}</strong>
+            </div>
+          </div>
         </div>
-      </div>
 
-      <div class="field">
-        <label>ملاحظات (اختياري)</label>
-        <textarea name="notes" rows="4" placeholder="ملاحظات عن أداء الطالبة في الاختبار..."></textarea>
-      </div>
+        <!-- Test Table -->
+        <div style="overflow-x:auto;margin-bottom:16px">
+          <table style="width:100%;border-collapse:collapse;font-size:13px">
+            <thead>
+              <tr style="background:#f0f0f0">
+                <th style="border:1px solid #333;padding:8px;width:120px">الفئة العمرية</th>
+                <th style="border:1px solid #333;padding:8px">البنود</th>
+                <th style="border:1px solid #333;padding:8px;width:80px">صح/خطأ</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${sections.map(sec => sec.items.map((item, itemIdx) => `
+                <tr>
+                  ${itemIdx === 0 ? `<td rowspan="${sec.items.length}" style="border:1px solid #333;padding:8px;text-align:center;vertical-align:middle;font-weight:bold">
+                    (${sec.num})<br><small style="font-weight:normal">${sec.age}</small>
+                  </td>` : ''}
+                  <td style="border:1px solid #333;padding:8px;text-align:center;font-size:15px;font-weight:bold;letter-spacing:2px">${item}</td>
+                  <td style="border:1px solid #333;padding:8px;text-align:center">
+                    <select name="num_${sec.num}_${itemIdx}" style="padding:3px;font-size:12px">
+                      <option value="">-</option>
+                      <option value="صح">✓</option>
+                      <option value="خطأ">✗</option>
+                    </select>
+                  </td>
+                </tr>
+              `).join('')).join('')}
+            </tbody>
+          </table>
+        </div>
 
-      <button type="submit" class="btn lg block">${I.check}<span>حفظ الاختبار</span></button>
-    </form>
-  `, { lg: true });
+        <div class="field">
+          <label>ملاحظات</label>
+          <textarea name="notes" rows="2" placeholder="ملاحظات..."></textarea>
+        </div>
+
+        <button type="submit" class="btn lg block">${I.check}<span>حفظ الاختبار</span></button>
+      </form>
+    `, { lg: true });
+
+  } else {
+    // الذاكرة السمعية للكلمات
+    const wordGroups = [
+      ['نجح محمد.', 'هدى تلعب.', 'زرع كثير.'],
+      ['مها تلميذة مجتهدة.', 'صفاء تحب المدرسة.', 'يلعب على كثيراً.'],
+      ['هدى تذهب إلى المدرسة', 'الفتاة النظيفة تحب المدرسة', 'قرأت القران قبل قليل'],
+      ['يلعب على مع حسام بالكرة.', 'هدى تحب ركوب الدرجة والدراسة.', 'السماء صافية وليس بها غيوم.'],
+      ['أحب أن ألعب بالمضرب في الصباح.', 'أذاكر دروسي بانتظام وأنام مبكراً يومياً.', 'الحديقة مليئة بالأزهار الملونة ورائحتها جميلة'],
+    ];
+
+    openModal(`
+      <div class="modal-head">
+        <h2>🧠 الذاكرة السمعية للكلمات — ${esc(st.name)}</h2>
+        <button class="x" data-action="close-modal">${I.close}</button>
+      </div>
+      <form data-form="add-memory-test" data-sid="${sid}" data-type="2">
+
+        <!-- Header Info -->
+        <div style="border:2px solid #333;margin-bottom:16px">
+          <div style="background:#1a1a6e;color:white;text-align:center;padding:10px;font-size:18px;font-weight:bold">
+            الذاكرة السمعية للكلمات
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;border-top:1px solid #333">
+            <div style="padding:8px;border-left:1px solid #333">
+              <span class="text-muted text-sm">الاسم: </span>
+              <strong>${esc(st.name)}</strong>
+            </div>
+            <div style="padding:8px;border-left:1px solid #333">
+              <span class="text-muted text-sm">التاريخ: </span>
+              <input type="date" name="tested_at" value="${today}" style="border:none;font-size:13px">
+            </div>
+            <div style="padding:8px">
+              <span class="text-muted text-sm">أخصائية/ معلمة النطق: </span>
+              <strong>${esc(STATE.user?.name || '')}</strong>
+            </div>
+          </div>
+        </div>
+
+        <!-- Test Table -->
+        <div style="overflow-x:auto;margin-bottom:16px">
+          <table style="width:100%;border-collapse:collapse;font-size:13px">
+            <tbody>
+              ${wordGroups.map((group, gi) => `
+                <tr>
+                  <td style="border:1px solid #333;padding:12px;vertical-align:top">
+                    <div style="display:flex;flex-direction:column;gap:6px">
+                      ${group.map((sentence, si) => `
+                        <div style="display:flex;align-items:center;gap:10px;justify-content:space-between">
+                          <span style="font-size:14px">${sentence}</span>
+                          <select name="word_${gi}_${si}" style="padding:3px;font-size:12px;flex-shrink:0">
+                            <option value="">-</option>
+                            <option value="صح">✓ صح</option>
+                            <option value="خطأ">✗ خطأ</option>
+                          </select>
+                        </div>
+                      `).join('')}
+                    </div>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="field">
+          <label>ملاحظات</label>
+          <textarea name="notes" rows="2" placeholder="ملاحظات..."></textarea>
+        </div>
+
+        <button type="submit" class="btn lg block">${I.check}<span>حفظ الاختبار</span></button>
+      </form>
+    `, { lg: true });
+  }
 }
 
-function viewMemoryTestModal(id) {
+viewMemoryTestModal = function(id) {
   const test = STATE.data.auditoryMemoryTests.find(t => t.id === id);
   if (!test) return;
   
@@ -10853,7 +10934,7 @@ function viewMemoryTestModal(id) {
 }
 
 // 3️⃣ التقرير المبدئي - Modal
-function openInitialReportModal(sid, reportId = null) {
+openInitialReportModal = function(sid, reportId = null) {
   const isEdit = !!reportId;
   const report = isEdit ? STATE.data.initialReports.find(r => r.id === reportId) : null;
   const st = isEdit ? studentBy(report.studentId) : studentBy(sid);
@@ -10923,7 +11004,7 @@ function openInitialReportModal(sid, reportId = null) {
   `, { lg: true });
 }
 
-function viewInitialReportModal(id) {
+viewInitialReportModal = function(id) {
   const report = STATE.data.initialReports.find(r => r.id === id);
   if (!report) return;
   
@@ -10996,7 +11077,7 @@ function viewInitialReportModal(id) {
   `, { lg: true });
 }
 
-function printInitialReport(id) {
+printInitialReport = function(id) {
   const report = STATE.data.initialReports.find(r => r.id === id);
   if (!report) return;
   
@@ -11129,7 +11210,7 @@ document.addEventListener('click', (e) => {
    PRINCIPAL (المديرة) VIEWS
    ========================================================= */
 
-viewPrincipalDashboard = function() {
+function viewPrincipalDashboard() {
   const teachers = STATE.data.users.filter(u => u.role === 'teacher');
   const students = STATE.data.students.filter(s => !s.archived);
   const parents = STATE.data.users.filter(u => u.role === 'parent');
@@ -11247,7 +11328,7 @@ function teacherPermissionPills(t) {
   `).join('');
 }
 
-viewPrincipalTeachers = function() {
+function viewPrincipalTeachers() {
   const teachers = STATE.data.users.filter(u => u.role === 'teacher');
 
   return `
@@ -11352,7 +11433,7 @@ viewPrincipalTeachers = function() {
   `;
 }
 
-viewPrincipalStudents = function() {
+function viewPrincipalStudents() {
   const students = STATE.data.students.filter(s => !s.archived);
   const byGrade = {};
   students.forEach(s => {
@@ -11423,7 +11504,7 @@ viewPrincipalStudents = function() {
 /* =========================================================
    PRINCIPAL - IEPs VIEW
    ========================================================= */
-viewPrincipalIEPs = function() {
+function viewPrincipalIEPs() {
   const students = STATE.data.students.filter(s => !s.archived);
   
   // Separate students by teacher type
@@ -11561,7 +11642,7 @@ viewPrincipalIEPs = function() {
   `;
 }
 
-viewPrincipalReports = function() {
+function viewPrincipalReports() {
   const students = STATE.data.students.filter(s => !s.archived);
   const teachers = STATE.data.users.filter(u => u.role === 'teacher');
   const totalActivities = STATE.data.activities.length;
@@ -12777,13 +12858,9 @@ document.addEventListener('submit', async (e) => {
 document.addEventListener('submit', async (e) => {
   if (e.target.matches('[data-form="real-login"]')) {
     e.preventDefault();
-    e.stopPropagation(); // Stop event from bubbling
-    
     const form = e.target;
     const submitBtn = form.querySelector('button[type="submit"]');
     const originalText = submitBtn.innerHTML;
-    
-    console.log('🔐 Login form submitted');
     
     try {
       submitBtn.disabled = true;
@@ -12791,27 +12868,15 @@ document.addEventListener('submit', async (e) => {
 
       const email = form.email.value;
       const password = form.password.value;
-      
-      console.log('📧 Email:', email);
-      console.log('🔑 Attempting authentication...');
 
       // Real authentication with Supabase
       const user = await Auth.loginWithEmail(email, password);
-      
-      console.log('✅ Auth successful, user:', user);
-      
       STATE.user = user;
-      
-      console.log('📥 Loading data from Supabase...');
       
       // Load data from Supabase
       await loadDataFromSupabase();
       
-      console.log('💾 Persisting state...');
-      
       persistState();
-      
-      console.log('🧭 Navigating to dashboard...');
       
       // Students see parent dashboard (their own data)
       if (user.role === 'student') {
@@ -12823,11 +12888,8 @@ document.addEventListener('submit', async (e) => {
       }
       
       toast(`مرحباً ${user.name}`);
-      
-      console.log('✅ Login complete!');
-      
     } catch (error) {
-      console.error('❌ Login error:', error);
+      console.error('Login error:', error);
       
       const email = form.email?.value || 'unknown';
       
@@ -12839,7 +12901,7 @@ document.addEventListener('submit', async (e) => {
         errorMsg = `⚠️ تم تسجيل الدخول بنجاح، لكن لم يتم العثور على حساب لهذا البريد.
 
 هل أنت:
-• المديرة؟ → شغّل ملف FIX-PRINCIPAL-SIMPLE.sql في Supabase
+• المديرة؟ → شغّل ملف FRESH-START.sql في Supabase
 • طالب؟ → يجب أن تقوم المديرة/المعلمة بإنشاء حسابك أولاً
 
 البريد المستخدم: ${email}`;
@@ -13396,7 +13458,7 @@ function broadcastTyping(studentId, isTyping) {
 }
 
 // Setup typing indicator listeners
-function setupTypingIndicator() {
+setupTypingIndicator = function() {
   const form = document.querySelector('[data-form="send-message"]');
   if (!form) return;
   
@@ -13573,4 +13635,3 @@ window.addEventListener('load', () => {
     }
   });
 });
-}
