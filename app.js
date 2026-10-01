@@ -1415,7 +1415,7 @@ const FORM_TYPES = [
   { key: 'initialData',        name: 'البيانات الأولية',     sub: 'بيانات الطالبة الأساسية (مشتركة بين المعلمات)', icon: '📝', shared: true },
   { key: 'preAssessment',      name: 'التقييم القبلي',        sub: 'تقييم المستوى قبل بدء الخطة',       icon: '📋' },
   { key: 'speechTest',         name: 'اختبار النطق',          sub: 'تقييم نطق الأصوات والكلمات',        icon: '🗣️' },
-  { key: 'auditoryMemoryTest', name: 'اختبار الذاكرة السمعية', sub: 'تقييم القدرة على تذكر الأصوات',     icon: '👂' },
+  { key: 'auditoryMemoryTest', name: 'اختبار الذاكرة السمعية', sub: 'تقييم القدرة على تذكر الأصوات', icon: '👂', isMemory: true },
 ];
 
 // Special Ed Teacher specific forms
@@ -1803,6 +1803,11 @@ function renderFormsTab(st) {
           const notes = st.special_ed_forms?.student_notes || [];
           completed = notes.length > 0;
           data = { notes };
+        } else if (ft.isMemory) {
+          // Auditory memory tests
+          const tests = STATE.data.auditoryMemoryTests.filter(t => t.studentId === st.id);
+          completed = tests.length > 0;
+          data = { tests };
         } else {
           data = forms[ft.key] || {};
           completed = data.signed || data.completed;
@@ -1854,6 +1859,15 @@ function renderFormsTab(st) {
                   ${I.plus}
                   <span>إدارة الملاحظات</span>
                 </button>
+              ` : ft.isMemory ? `
+                <button class="btn soft sm form-card-btn"
+                  data-action="add-memory-test" data-sid="${st.id}" data-type="1">
+                  🔢 <span>للأرقام</span>
+                </button>
+                <button class="btn soft sm form-card-btn"
+                  data-action="add-memory-test" data-sid="${st.id}" data-type="2">
+                  📝 <span>للكلمات</span>
+                </button>
               ` : `
                 <button class="btn ${completed ? 'ghost' : 'soft'} block form-card-btn"
                   data-action="${completed ? 'view-form' : 'complete-form'}"
@@ -1869,7 +1883,7 @@ function renderFormsTab(st) {
                     <span>تعديل</span>
                   </button>
                 ` : ''}
-                ${ft.allowPDF && isSpecialEd ? `
+                ${(ft.key === 'parentConsent' || ft.key === 'initialData' || ft.allowPDF) ? `
                   <button class="btn ghost form-card-btn"
                     data-action="upload-pdf"
                     data-sid="${st.id}" data-fkey="${ft.key}">
@@ -7618,10 +7632,10 @@ const PRE_ASSESSMENT_SECTIONS = [
     num: 3,
     title: 'تقييم (غير رسمي) للمهارات اللغوية',
     cols: ['متقن','متقن جزئياً','غير متقن'],
-    note: 'الحالة تُظهر تنغيماً',
+    note: 'تقييم (غير رسمي) للمهارات اللغوية',
     questions: [
-      { id: 'inf_tone', label: 'الحالة تُظهر تنغيماً', type: 'eval3' },
-      { id: 'inf_play_skills', label: 'مهارات اللعب', type: 'text', placeholder: 'ملاحظات' },
+      { id: 'inf_non_verbal_header', label: 'الحالة الغير ناطقة', type: 'header' },
+      { id: 'inf_play_skills', label: 'مهارات اللعب', type: 'eval3' },
       { id: 'inf_gestures', label: 'استخدام الإشارات أو الإيماءات', type: 'eval3' },
       { id: 'inf_receptive_nonverbal', label: 'الاستجابة الغير لفظية للمحفز اللفظي', type: 'eval3' },
       { id: 'inf_voluntary_sounds', label: 'احتمال إصدار كلمات أو أصوات عفوية', type: 'eval3' },
@@ -7823,22 +7837,31 @@ async function viewPDFDocument(sid, fkey) {
   if (!st) return;
   
   const pdfUrl = st.special_ed_forms?.[fkey];
-  
-  if (!pdfUrl) {
-    toast('لم يتم رفع ملف بعد', 'error');
-    return;
-  }
+  if (!pdfUrl) { toast('لم يتم رفع ملف بعد', 'error'); return; }
   
   try {
-    // Get signed URL from Supabase Storage
-    const { data, error } = await window.supabaseClient.storage
-      .from('student-documents')
-      .createSignedUrl(pdfUrl, 3600); // Valid for 1 hour
+    // Check if it's base64 (fallback) or storage path
+    const isBase64 = typeof pdfUrl === 'string' && pdfUrl.startsWith('data:');
+    const isStoragePath = typeof pdfUrl === 'string' && !pdfUrl.startsWith('data:') && !pdfUrl.startsWith('http');
     
-    if (error) throw error;
+    if (isBase64) {
+      // Open base64 directly
+      const win = window.open('', '_blank');
+      win.document.write(`<iframe src="${pdfUrl}" width="100%" height="100%" style="border:none"></iframe>`);
+      return;
+    }
     
-    // Open in new tab
-    window.open(data.signedUrl, '_blank');
+    if (isStoragePath) {
+      const { data, error } = await window.supabaseClient.storage
+        .from('student-documents')
+        .createSignedUrl(pdfUrl, 3600);
+      if (error) throw error;
+      window.open(data.signedUrl, '_blank');
+      return;
+    }
+    
+    // Direct URL
+    window.open(pdfUrl, '_blank');
   } catch (error) {
     console.error('Error viewing PDF:', error);
     toast('حدث خطأ أثناء فتح الملف', 'error');
@@ -7846,16 +7869,22 @@ async function viewPDFDocument(sid, fkey) {
 }
 
 async function viewSinglePDF(pdfUrl) {
+  if (!pdfUrl) { toast('لا يوجد ملف', 'error'); return; }
   try {
-    // Get signed URL from Supabase Storage
-    const { data, error } = await window.supabaseClient.storage
-      .from('student-documents')
-      .createSignedUrl(pdfUrl, 3600); // Valid for 1 hour
-    
-    if (error) throw error;
-    
-    // Open in new tab
-    window.open(data.signedUrl, '_blank');
+    if (pdfUrl.startsWith('data:')) {
+      const win = window.open('', '_blank');
+      win.document.write(`<iframe src="${pdfUrl}" width="100%" height="100%" style="border:none"></iframe>`);
+      return;
+    }
+    if (!pdfUrl.startsWith('http')) {
+      const { data, error } = await window.supabaseClient.storage
+        .from('student-documents')
+        .createSignedUrl(pdfUrl, 3600);
+      if (error) throw error;
+      window.open(data.signedUrl, '_blank');
+      return;
+    }
+    window.open(pdfUrl, '_blank');
   } catch (error) {
     console.error('Error viewing PDF:', error);
     toast('حدث خطأ أثناء فتح الملف', 'error');
@@ -8780,6 +8809,12 @@ function renderInitialDataForm(st, data, viewOnly) {
         <label>التشخيص الطبي</label>
         <input name="medicalDiagnosis" value="${esc(initialData.medicalDiagnosis || '')}" placeholder="مثال: اضطراب طيف التوحد، تأخر نطق">
         <div class="text-xs text-muted mt-sm">يمكن ترك هذا الحقل فارغاً إذا لم يتوفر تشخيص بعد</div>
+        <!-- رفع ملف التشخيص الطبي -->
+        <div style="margin-top:10px;padding:10px;background:var(--canvas);border-radius:8px">
+          <div class="text-xs text-bold mb-xs">📎 رفع ملف التشخيص الطبي (اختياري)</div>
+          <input type="file" name="medicalDiagnosisPDF" accept=".pdf,image/*" style="font-size:13px">
+          ${initialData.medicalDiagnosisPDF ? `<div class="text-xs text-muted mt-xs">✅ تم رفع ملف سابقاً</div>` : ''}
+        </div>
       </div>
       
       <div class="field">
@@ -10494,155 +10529,179 @@ function openAddFollowupModal(sid) {
   const today = new Date().toISOString().slice(0, 10);
   const planGoals = plan?.goals || [];
 
-  // Get week start/end (Sunday to Thursday)
-  const now = new Date();
-  const day = now.getDay();
-  const sunday = new Date(now); sunday.setDate(now.getDate() - day);
-  const thursday = new Date(sunday); thursday.setDate(sunday.getDate() + 4);
-  const weekFrom = sunday.toISOString().slice(0,10);
-  const weekTo = thursday.toISOString().slice(0,10);
+  // Categorize goals by type
+  const receptiveGoals = planGoals.filter(g => (g.category || g.type || '') === 'استقبالي' || (g.text||'').includes('استقبال'));
+  const expressiveGoals = planGoals.filter(g => (g.category || g.type || '') === 'تعبيري' || (g.text||'').includes('تعبير'));
+  const articulationGoals = planGoals.filter(g => (g.category || g.type || '') === 'نطق' || (g.text||'').includes('نطق'));
+  // If no categories, show all goals in all dropdowns
+  const allGoals = planGoals;
 
-  const toolsList = ['بطاقات', 'مجسمات', 'ألعاب', 'جهاز', 'لوحي', 'أوراق عمل', 'مرآة', 'أخرى', 'عرض مرئي', 'بازل', 'سبورة', 'سبورة ذكية'];
+  const goalOptions = (goals) => {
+    const list = goals.length > 0 ? goals : allGoals;
+    return `<option value="">-- اختر هدف --</option>` +
+      list.map(g => `<option value="${esc(g.id || g.text || g)}">${esc(g.text || g.goal || g)}</option>`).join('');
+  };
 
-  const goalsHTML = planGoals.length === 0 ? `
-    <div class="text-sm text-muted" style="padding:8px">لا توجد أهداف في الخطة الفردية</div>
-  ` : planGoals.map((g, i) => `
-    <label class="row" style="gap:10px;align-items:flex-start;padding:8px;border-radius:8px;cursor:pointer;border:1px solid var(--hair);margin-bottom:6px">
-      <input type="checkbox" name="selected_goals" value="${i}" style="margin-top:3px;flex-shrink:0">
-      <div>
-        <div class="text-bold text-sm">${esc(g.text || g.goal || g)}</div>
-        ${g.subGoal ? `<div class="text-xs text-muted">${esc(g.subGoal)}</div>` : ''}
-      </div>
-    </label>
-  `).join('');
+  const teachingGoalOptions = `
+    <option value="">-- اختر الهدف التدريسي --</option>
+    <option value="أن تستجيب الطالبة لاسمها">أن تستجيب الطالبة لاسمها</option>
+    <option value="أن تشير الطالبة للصورة المطلوبة">أن تشير الطالبة للصورة المطلوبة</option>
+    <option value="أن تنفذ الطالبة أمراً بسيطاً">أن تنفذ الطالبة أمراً بسيطاً</option>
+    <option value="أن تسمي الطالبة الصورة المطلوبة">أن تسمي الطالبة الصورة المطلوبة</option>
+    <option value="أن تعبر الطالبة عن حاجتها">أن تعبر الطالبة عن حاجتها</option>
+    <option value="أن تنطق الطالبة الصوت المستهدف">أن تنطق الطالبة الصوت المستهدف</option>
+    <option value="أن تكرر الطالبة الكلمة بشكل صحيح">أن تكرر الطالبة الكلمة بشكل صحيح</option>
+    <option value="أن تجيب الطالبة على سؤال بسيط">أن تجيب الطالبة على سؤال بسيط</option>
+    <option value="أخرى">أخرى (اكتبي يدوياً)</option>
+  `;
 
-  const tableRowsHTML = planGoals.map((g, i) => `
-    <tr class="followup-goal-row" data-goal-idx="${i}" style="display:none">
-      <td style="padding:8px;vertical-align:top;min-width:160px">
-        <div class="text-bold text-sm">${esc(g.text || g.goal || g)}</div>
-        ${g.subGoal ? `<div class="text-xs text-muted mt-xs">${esc(g.subGoal)}</div>` : ''}
-        <div class="mt-xs">
-          <input type="text" name="goal_${i}_short_term" placeholder="الهدف قصير المدى..." style="font-size:12px;padding:4px 8px;width:100%">
-          <div style="display:flex;gap:6px;margin-top:4px">
-            <input type="date" name="goal_${i}_date_from" value="${weekFrom}" style="font-size:11px;padding:3px;flex:1">
-            <span style="align-self:center">—</span>
-            <input type="date" name="goal_${i}_date_to" value="${weekTo}" style="font-size:11px;padding:3px;flex:1">
-          </div>
-        </div>
-      </td>
-      <td style="padding:8px;vertical-align:top;min-width:160px">
-        <textarea name="goal_${i}_teaching_goals" rows="3" placeholder="الأهداف التدريسية..." style="width:100%;font-size:12px;padding:4px 8px;resize:vertical"></textarea>
-      </td>
-      <td style="padding:8px;vertical-align:top">
-        <div style="display:flex;flex-direction:column;gap:4px">
-          ${toolsList.map(t => `
-            <label style="display:flex;gap:6px;align-items:center;font-size:12px;cursor:pointer">
-              <input type="checkbox" name="goal_${i}_tools" value="${t}">
-              ${t}
-            </label>
-          `).join('')}
-        </div>
-      </td>
-      <td style="padding:8px;vertical-align:top">
-        <select name="goal_${i}_reinforcement" style="font-size:12px;padding:4px;width:100%">
-          <option value="لفظي">لفظي</option>
-          <option value="مادي">مادي</option>
-          <option value="اجتماعي">اجتماعي</option>
-          <option value="رمزي">رمزي</option>
-        </select>
-      </td>
-      <td style="padding:8px;vertical-align:top">
-        <div style="display:flex;flex-direction:column;gap:4px">
-          <label style="font-size:11px;color:var(--text-muted)">الأحد</label>
-          <input type="date" name="goal_${i}_week_sun" style="font-size:11px;padding:3px">
-          <label style="font-size:11px;color:var(--text-muted)">الاثنين</label>
-          <input type="date" name="goal_${i}_week_mon" style="font-size:11px;padding:3px">
-        </div>
-      </td>
-      <td style="padding:8px;vertical-align:top">
-        <select name="goal_${i}_evaluation" style="font-size:12px;padding:4px;width:100%">
-          <option value="مستمر">مستمر</option>
-          <option value="أتقن">أتقن</option>
-          <option value="جزئياً">جزئياً</option>
-          <option value="لم يتقن">لم يتقن</option>
-          <option value="قيد التدريب">قيد التدريب</option>
-        </select>
-      </td>
-    </tr>
-  `).join('');
+  const toolsOptions = `
+    <option value="">-- اختر الوسيلة --</option>
+    <option value="مرآة">مرآة</option>
+    <option value="جهاز لوحي">جهاز لوحي</option>
+    <option value="مجسمات">مجسمات</option>
+    <option value="بطاقات صور">بطاقات صور</option>
+    <option value="سبورة">سبورة</option>
+    <option value="ألعاب">ألعاب</option>
+    <option value="أوراق عمل">أوراق عمل</option>
+    <option value="بازل">بازل</option>
+    <option value="فيديو">فيديو</option>
+    <option value="أخرى">أخرى</option>
+  `;
 
   openModal(`
     <div class="modal-head">
       <h2>📈 استمارة متابعة الأهداف — ${esc(st.name)}</h2>
       <button class="x" data-action="close-modal">${I.close}</button>
     </div>
-    <form data-form="add-followup" data-sid="${sid}">
+    <form data-form="add-followup" data-sid="${sid}" style="max-height:80vh;overflow-y:auto;padding:4px">
 
-      <!-- معلومات الطالبة -->
-      <div class="row" style="gap:12px;margin-bottom:16px;padding:12px;background:var(--canvas);border-radius:10px">
-        <div style="flex:1"><span class="text-muted text-sm">اسم الطالبة: </span><strong>${esc(st.name)}</strong></div>
-        <div style="flex:1"><span class="text-muted text-sm">الصف: </span><strong>${esc(st.grade || '')}</strong></div>
-        <div style="flex:1">
-          <span class="text-muted text-sm">أسبوع المتابعة: </span>
-          <input type="date" name="date_from" value="${weekFrom}" style="font-size:12px;padding:3px"> — 
-          <input type="date" name="date_to" value="${weekTo}" style="font-size:12px;padding:3px">
+      <!-- التاريخ -->
+      <div class="card mb-md" style="padding:14px">
+        <div class="text-bold mb-sm">📅 فترة المتابعة</div>
+        <div class="row" style="gap:12px">
+          <div class="field" style="flex:1">
+            <label>من</label>
+            <input name="date_from" type="date" value="${today}" required>
+          </div>
+          <div class="field" style="flex:1">
+            <label>إلى</label>
+            <input name="date_to" type="date" value="${today}" required>
+          </div>
         </div>
       </div>
 
-      <!-- اختيار الأهداف -->
-      <div class="card mb-md" style="padding:12px">
-        <div class="text-bold mb-sm">▼ بك أهداف الخطة (${planGoals.length} داخل الاستمارة)</div>
-        <div style="max-height:200px;overflow-y:auto">
-          ${goalsHTML}
+      <!-- هدف استقبالي -->
+      <div class="card mb-md" style="padding:14px;border-right:4px solid var(--blue)">
+        <div class="text-bold mb-sm" style="color:var(--blue)">🎯 هدف استقبالي</div>
+        <div class="field">
+          <label>الهدف</label>
+          <select name="receptive_goal" style="width:100%">
+            ${goalOptions(receptiveGoals)}
+          </select>
+        </div>
+        <div class="field">
+          <label>الأهداف التدريسية</label>
+          <select name="receptive_teaching_1" style="width:100%;margin-bottom:6px">
+            ${teachingGoalOptions}
+          </select>
+          <select name="receptive_teaching_2" style="width:100%;margin-bottom:6px">
+            ${teachingGoalOptions}
+          </select>
+          <select name="receptive_teaching_3" style="width:100%">
+            ${teachingGoalOptions}
+          </select>
         </div>
       </div>
 
-      <!-- جدول الاستمارة -->
-      <div style="overflow-x:auto;margin-bottom:16px">
-        <table style="width:100%;border-collapse:collapse;font-size:13px;min-width:700px">
-          <thead>
-            <tr style="background:var(--blue);color:white;text-align:center">
-              <th style="padding:10px;min-width:160px">الهدف قصر المدى + تاريخ الهدف</th>
-              <th style="padding:10px;min-width:160px">الأهداف التدريسية</th>
-              <th style="padding:10px;min-width:120px">الوسائل المستخدمة</th>
-              <th style="padding:10px;min-width:80px">التعزيز</th>
-              <th style="padding:10px;min-width:100px">الأسبوع</th>
-              <th style="padding:10px;min-width:80px">التقييم</th>
-            </tr>
-          </thead>
-          <tbody id="followup-goals-table">
-            ${tableRowsHTML}
-            <tr id="followup-empty-row">
-              <td colspan="6" style="text-align:center;padding:20px;color:var(--text-muted)">اختاري الأهداف من فوق لتظهر هنا</td>
-            </tr>
-          </tbody>
-        </table>
+      <!-- هدف تعبيري -->
+      <div class="card mb-md" style="padding:14px;border-right:4px solid var(--mint)">
+        <div class="text-bold mb-sm" style="color:var(--mint)">🎯 هدف تعبيري</div>
+        <div class="field">
+          <label>الهدف</label>
+          <select name="expressive_goal" style="width:100%">
+            ${goalOptions(expressiveGoals)}
+          </select>
+        </div>
+        <div class="field">
+          <label>الأهداف التدريسية</label>
+          <select name="expressive_teaching_1" style="width:100%;margin-bottom:6px">
+            ${teachingGoalOptions}
+          </select>
+          <select name="expressive_teaching_2" style="width:100%;margin-bottom:6px">
+            ${teachingGoalOptions}
+          </select>
+          <select name="expressive_teaching_3" style="width:100%">
+            ${teachingGoalOptions}
+          </select>
+        </div>
+      </div>
+
+      <!-- هدف نطق -->
+      <div class="card mb-md" style="padding:14px;border-right:4px solid var(--amber)">
+        <div class="text-bold mb-sm" style="color:var(--amber)">🎯 هدف نطق</div>
+        <div class="field">
+          <label>الهدف</label>
+          <select name="articulation_goal" style="width:100%">
+            ${goalOptions(articulationGoals)}
+          </select>
+        </div>
+        <div class="field">
+          <label>الأهداف التدريسية</label>
+          <select name="articulation_teaching_1" style="width:100%;margin-bottom:6px">
+            ${teachingGoalOptions}
+          </select>
+          <select name="articulation_teaching_2" style="width:100%;margin-bottom:6px">
+            ${teachingGoalOptions}
+          </select>
+          <select name="articulation_teaching_3" style="width:100%">
+            ${teachingGoalOptions}
+          </select>
+        </div>
+      </div>
+
+      <!-- الوسائل والتعزيز -->
+      <div class="card mb-md" style="padding:14px">
+        <div class="row" style="gap:12px">
+          <div class="field" style="flex:1">
+            <label>الوسائل المستخدمة</label>
+            <select name="tools_1" style="width:100%;margin-bottom:6px">
+              ${toolsOptions}
+            </select>
+            <select name="tools_2" style="width:100%;margin-bottom:6px">
+              ${toolsOptions}
+            </select>
+            <select name="tools_3" style="width:100%">
+              ${toolsOptions}
+            </select>
+          </div>
+          <div class="field" style="flex:1">
+            <label>التعزيز</label>
+            <label class="row" style="gap:8px;margin-bottom:8px;cursor:pointer">
+              <input type="checkbox" name="reinforcement" value="لفظي"> لفظي
+            </label>
+            <label class="row" style="gap:8px;margin-bottom:8px;cursor:pointer">
+              <input type="checkbox" name="reinforcement" value="مادي"> مادي
+            </label>
+            <label class="row" style="gap:8px;cursor:pointer">
+              <input type="checkbox" name="reinforcement" value="معنوي"> معنوي
+            </label>
+          </div>
+        </div>
       </div>
 
       <!-- ملاحظات -->
       <div class="field">
-        <label>ملاحظات (اختياري)</label>
-        <textarea name="notes" rows="2" placeholder="أضف ملاحظات..."></textarea>
+        <label>ملاحظات</label>
+        <textarea name="notes" rows="2" placeholder="ملاحظات إضافية..."></textarea>
       </div>
 
-      <div class="row" style="gap:12px;margin-top:16px">
-        <button type="submit" class="btn lg" style="flex:1">${I.check}<span>حفظ المتابعة</span></button>
+      <div class="row" style="gap:10px;margin-top:16px">
+        <button type="submit" class="btn lg" style="flex:2">${I.check}<span>حفظ المتابعة</span></button>
+        <button type="button" class="btn ghost lg" style="flex:1" onclick="closeModal()">${I.close}<span>إلغاء</span></button>
       </div>
+
     </form>
-
-    <script>
-      // Show/hide table rows based on checkbox selection
-      document.querySelectorAll('[name="selected_goals"]').forEach(cb => {
-        cb.addEventListener('change', function() {
-          const idx = this.value;
-          const row = document.querySelector('.followup-goal-row[data-goal-idx="' + idx + '"]');
-          const emptyRow = document.getElementById('followup-empty-row');
-          if (row) row.style.display = this.checked ? '' : 'none';
-          const anyChecked = document.querySelectorAll('[name="selected_goals"]:checked').length > 0;
-          if (emptyRow) emptyRow.style.display = anyChecked ? 'none' : '';
-        });
-      });
-    </script>
   `, { lg: true });
 }
 
@@ -12161,6 +12220,26 @@ document.addEventListener('submit', async (e) => {
         notes: formData.get('notes'),
       };
       
+      // Handle medical diagnosis PDF upload
+      const medPDF = formData.get('medicalDiagnosisPDF');
+      if (medPDF && medPDF.size > 0) {
+        try {
+          const reader = new FileReader();
+          const base64 = await new Promise((resolve, reject) => {
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(medPDF);
+          });
+          initialData.medicalDiagnosisPDF = base64;
+        } catch(e) { console.warn('Could not read medical PDF:', e); }
+      } else {
+        // Keep existing PDF if any
+        const existing = studentBy(formData.get ? sid : form.getAttribute('data-sid'));
+        if (existing?.shared_initial_data?.medicalDiagnosisPDF) {
+          initialData.medicalDiagnosisPDF = existing.shared_initial_data.medicalDiagnosisPDF;
+        }
+      }
+      
       // Update in Supabase
       const { error } = await window.supabaseClient
         .from('students')
@@ -12210,21 +12289,37 @@ document.addEventListener('submit', async (e) => {
       if (file.type !== 'application/pdf') throw new Error('يجب أن يكون الملف بصيغة PDF');
       
       // Upload to Supabase Storage
-      // Sanitize filename - replace Arabic/special chars with safe characters
       const sanitizedName = file.name
-        .replace(/[^\x00-\x7F]/g, '_')  // Replace non-ASCII with underscore
-        .replace(/\s+/g, '_')            // Replace spaces with underscore
-        .replace(/_{2,}/g, '_');         // Replace multiple underscores with one
+        .replace(/[^\x00-\x7F]/g, '_')
+        .replace(/\s+/g, '_')
+        .replace(/_{2,}/g, '_');
       const fileName = `${sid}/${fkey}/${Date.now()}_${sanitizedName}`;
+      
+      // Try Supabase Storage first
+      let fileUrl = null;
       const { data: uploadData, error: uploadError } = await window.supabaseClient.storage
         .from('student-documents')
         .upload(fileName, file, {
           cacheControl: '3600',
-          upsert: false,
-          contentType: 'application/pdf'
+          upsert: true,
+          contentType: file.type || 'application/pdf'
         });
       
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error('Storage upload error:', uploadError);
+        // Fallback: store as base64 in students table
+        const reader = new FileReader();
+        const base64 = await new Promise((resolve, reject) => {
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+        fileUrl = base64;
+        console.log('📁 Using base64 fallback for file storage');
+      } else {
+        fileUrl = fileName;
+        console.log('✅ File uploaded to Supabase Storage:', fileName);
+      }
       
       // Initialize special_ed_forms if needed
       if (!st.special_ed_forms) {
@@ -12239,7 +12334,7 @@ document.addEventListener('submit', async (e) => {
       
       // Save with teacher metadata
       st.special_ed_forms[fkey][teacherId] = {
-        url: fileName,
+        url: fileUrl,
         uploadedBy: teacherId,
         uploadedByName: STATE.user.name,
         uploadedAt: new Date().toISOString()
