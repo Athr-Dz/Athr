@@ -8480,25 +8480,27 @@ function openSpecialEdSessionModal(sid, sessionIdx = null) {
         </div>
       </div>
       
-      <div class="section-title">٢. الهدف قصير المدى</div>
+      <div class="section-title">٢. الأهداف قصيرة المدى</div>
+      <div id="short-term-goals-container">
+        ${(session?.short_term_goals_list || (session?.short_term_goal ? [session.short_term_goal] : [])).map((goal, idx) => `
+          <div class="short-term-goal-item" style="display:flex;gap:8px;margin-bottom:8px;align-items:center">
+            <input type="text" name="short_term_goal_text_${idx}" value="${esc(goal)}" placeholder="اكتبي الهدف قصير المدى..." style="flex:1;padding:8px 12px;border:1.5px solid var(--border-strong);border-radius:10px">
+            <button type="button" class="btn danger-soft sm" onclick="this.parentElement.remove()">✕</button>
+          </div>
+        `).join('')}
+      </div>
       ${shortTermGoals.length > 0 ? `
         <div class="field">
-          <label>اختر هدف قصير المدى من الخطة الفردية</label>
-          <select name="short_term_goal_id">
-            <option value="">-- اختر هدف --</option>
-            ${shortTermGoals.map((goal, idx) => `
-              <option value="${idx}" ${session?.short_term_goal_id === idx ? 'selected' : ''}>
-                ${esc(goal.text)}
-              </option>
-            `).join('')}
+          <label class="text-sm text-muted">أو اختر من الخطة الفردية:</label>
+          <select onchange="if(this.value){const c=document.getElementById('short-term-goals-container');const idx=c.querySelectorAll('.short-term-goal-item').length;c.insertAdjacentHTML('beforeend',\`<div class='short-term-goal-item' style='display:flex;gap:8px;margin-bottom:8px;align-items:center'><input type='text' name='short_term_goal_text_\${idx}' value='\${this.value.replace(/'/g,'&apos;')}' style='flex:1;padding:8px 12px;border:1.5px solid var(--border-strong);border-radius:10px'><button type='button' class='btn danger-soft sm' onclick='this.parentElement.remove()'>✕</button></div>\`);this.value=''}">
+            <option value="">-- اختر هدف من الخطة --</option>
+            ${shortTermGoals.map((goal, idx) => `<option value="${esc(goal.text)}">${esc(goal.text)}</option>`).join('')}
           </select>
         </div>
-      ` : `
-        <div class="alert" style="background:var(--warn-50);border-color:var(--warn)">
-          ${I.flag}
-          <div class="text-sm">لا توجد أهداف قصيرة المدى في الخطة الفردية. قم بإضافة الأهداف من تبويب "الخطة الفردية" أولاً.</div>
-        </div>
-      `}
+      ` : ''}
+      <button type="button" class="btn ghost sm mt-xs" onclick="const c=document.getElementById('short-term-goals-container');const idx=c.querySelectorAll('.short-term-goal-item').length;c.insertAdjacentHTML('beforeend',\`<div class='short-term-goal-item' style='display:flex;gap:8px;margin-bottom:8px;align-items:center'><input type='text' name='short_term_goal_text_\${idx}' placeholder='اكتبي الهدف قصير المدى...' style='flex:1;padding:8px 12px;border:1.5px solid var(--border-strong);border-radius:10px'><button type='button' class='btn danger-soft sm' onclick='this.parentElement.remove()'>✕</button></div>\`)">
+        ${I.plus}<span>إضافة هدف قصير المدى يدوياً</span>
+      </button>
       
       <div class="section-title">٣. الأهداف الإجرائية السلوكية</div>
       <div id="procedural-goals-container">
@@ -12685,10 +12687,18 @@ document.addEventListener('submit', async (e) => {
       
       if (!st) throw new Error('Student not found');
       
-      // Get short term goal text if selected
+      // Get short term goals (multiple now)
+      const shortTermGoalsList = [];
+      let stgIdx = 0;
+      while (formData.has(`short_term_goal_text_${stgIdx}`)) {
+        const t = formData.get(`short_term_goal_text_${stgIdx}`);
+        if (t && t.trim()) shortTermGoalsList.push(t.trim());
+        stgIdx++;
+      }
+      // Fallback to old single goal field
       const shortTermGoalId = formData.get('short_term_goal_id');
-      let shortTermGoalText = '';
-      if (shortTermGoalId) {
+      let shortTermGoalText = shortTermGoalsList[0] || '';
+      if (!shortTermGoalText && shortTermGoalId) {
         const goals = st.special_ed_iep?.short_term_goals || [];
         const goal = goals[parseInt(shortTermGoalId)];
         if (goal) shortTermGoalText = goal.text;
@@ -12719,6 +12729,7 @@ document.addEventListener('submit', async (e) => {
         date_to: formData.get('date_to'),
         short_term_goal_id: shortTermGoalId ? parseInt(shortTermGoalId) : null,
         short_term_goal: shortTermGoalText,
+        short_term_goals_list: shortTermGoalsList,
         procedural_goals: proceduralGoals,
         tools: tools,
         tools_other: formData.get('tools_other'),
