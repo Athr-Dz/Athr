@@ -6056,7 +6056,7 @@ document.addEventListener('submit', (e) => {
     const inviteCode = 'ATHR-' + (1000 + STATE.data.students.length + Math.floor(Math.random() * 90));
     STATE.data.students.push({
       id: sid, name, age: 7, grade: `${stage} ${section}`, color, initials,
-      teacherId: STATE.user.id, parentId: pid, planId: 'pl-new-' + Date.now(),
+      teacherId: STATE.user.id, teacher_id: STATE.user.id, parentId: pid, planId: 'pl-new-' + Date.now(),
       parentPhone: phoneNormalized, inviteCode,
       baselineLevel: '', baselineVideo: null,
       points: 0, badges: [],
@@ -6601,8 +6601,8 @@ document.addEventListener('submit', (e) => {
     const period = fd.get('period'); // رقم الحصة
     if (!sid || !day || !period) { toast('أكملي البيانات', 'warn'); return; }
     
-    // Check period conflicts across all students for the same day
-    const myStudents = STATE.data.students.filter(s => !s.archived);
+    // Check period conflicts across teacher's own students for the same day
+    const myStudents = STATE.data.students.filter(s => !s.archived && (s.teacherId === STATE.user.id || s.teacher_id === STATE.user.id));
     let conflict = null;
     myStudents.forEach(s => (s.schedule || []).forEach(slot => {
       if (slot.day !== day) return;
@@ -6899,34 +6899,45 @@ document.addEventListener('submit', (e) => {
     e.preventDefault();
     const sid = fAddFollowup.getAttribute('data-sid');
     const fd = new FormData(fAddFollowup);
-    
-    // Get selected tools
-    const tools = Array.from(fAddFollowup.querySelectorAll('input[name="tools"]:checked'))
+
+    // Get reinforcement checkboxes
+    const reinforcement = Array.from(fAddFollowup.querySelectorAll('input[name="reinforcement"]:checked'))
       .map(cb => cb.value);
-    
+
+    // Get tools from dropdowns
+    const tools = ['tools_1','tools_2','tools_3']
+      .map(n => fd.get(n)).filter(v => v && v !== '');
+
+    // Build plan_goals object from new form fields
+    const plan_goals = {
+      receptive: {
+        goal: fd.get('receptive_goal') || '',
+        teaching: [fd.get('receptive_teaching_1'), fd.get('receptive_teaching_2'), fd.get('receptive_teaching_3')].filter(v => v && v !== ''),
+      },
+      expressive: {
+        goal: fd.get('expressive_goal') || '',
+        teaching: [fd.get('expressive_teaching_1'), fd.get('expressive_teaching_2'), fd.get('expressive_teaching_3')].filter(v => v && v !== ''),
+      },
+      articulation: {
+        goal: fd.get('articulation_goal') || '',
+        teaching: [fd.get('articulation_teaching_1'), fd.get('articulation_teaching_2'), fd.get('articulation_teaching_3')].filter(v => v && v !== ''),
+      },
+      tools,
+      reinforcement,
+    };
+
     const followupData = {
       id: 'fup-' + Date.now(),
       studentId: sid,
       teacher_id: STATE.user.id,
       date_from: fd.get('date_from'),
       date_to: fd.get('date_to'),
-      goal_1_id: fd.get('goal_1_id') || null,
-      goal_1_evaluation: fd.get('goal_1_evaluation') || null,
-      goal_2_id: fd.get('goal_2_id') || null,
-      goal_2_evaluation: fd.get('goal_2_evaluation') || null,
-      custom_goal_1: fd.get('custom_goal_1') || null,
-      custom_goal_1_type: fd.get('custom_goal_1_type') || null,
-      custom_goal_1_evaluation: fd.get('custom_goal_1_evaluation') || null,
-      custom_goal_2: fd.get('custom_goal_2') || null,
-      custom_goal_2_type: fd.get('custom_goal_2_type') || null,
-      custom_goal_2_evaluation: fd.get('custom_goal_2_evaluation') || null,
-      tools: tools,
+      plan_goals,
       notes: fd.get('notes') || '',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
-    
-    // Save to Supabase
+
     (async () => {
       try {
         const { data, error } = await window.supabaseClient
@@ -6936,24 +6947,14 @@ document.addEventListener('submit', (e) => {
             teacher_id: STATE.user.id,
             date_from: followupData.date_from,
             date_to: followupData.date_to,
-            goal_1_id: followupData.goal_1_id,
-            goal_1_evaluation: followupData.goal_1_evaluation,
-            goal_2_id: followupData.goal_2_id,
-            goal_2_evaluation: followupData.goal_2_evaluation,
-            custom_goal_1: followupData.custom_goal_1,
-            custom_goal_1_type: followupData.custom_goal_1_type,
-            custom_goal_1_evaluation: followupData.custom_goal_1_evaluation,
-            custom_goal_2: followupData.custom_goal_2,
-            custom_goal_2_type: followupData.custom_goal_2_type,
-            custom_goal_2_evaluation: followupData.custom_goal_2_evaluation,
-            tools: JSON.stringify(tools),
+            plan_goals: plan_goals,
             notes: followupData.notes
           })
           .select()
           .single();
-        
+
         if (error) throw error;
-        
+
         followupData.id = data.id;
         STATE.data.studentFollowups.unshift(followupData);
         persistState();
@@ -7385,7 +7386,7 @@ function openEditStudentModal(student) {
 
 function viewScheduleEditor() {
   const me = STATE.user;
-  const myStudents = STATE.data.students.filter(s => !s.archived); // Show ALL students
+  const myStudents = STATE.data.students.filter(s => !s.archived && (s.teacherId === me.id || s.teacher_id === me.id));
   const allKeys  = ['sun','mon','tue','wed','thu','fri','sat'];
   const allNames = ['الأحد','الإثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
   const dayKeys  = STATE.config.workingDays || allKeys.slice(0,5);
@@ -7457,7 +7458,7 @@ function viewScheduleEditor() {
 
 function openAddSlotModal(presetDay) {
   const me = STATE.user;
-  const myStudents = STATE.data.students.filter(s => !s.archived); // Show ALL students
+  const myStudents = STATE.data.students.filter(s => !s.archived && (s.teacherId === me.id || s.teacher_id === me.id));
   const allKeys  = ['sun','mon','tue','wed','thu','fri','sat'];
   const allNames = ['الأحد','الإثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
   const dayKeys = STATE.config.workingDays || allKeys.slice(0,5);
@@ -13063,12 +13064,15 @@ async function loadDataFromSupabase() {
     const { data: students } = await studentsQuery;
     if (students) {
       // ✅ FIX: Ensure forms is always an object, not an array
+      // ✅ FIX: Normalize teacher_id → teacherId for consistency
       students.forEach(student => {
         if (Array.isArray(student.forms)) {
-          console.warn('⚠️ Student', student.name, 'has forms as array, converting to object');
           student.forms = {};
         }
         if (!student.forms) student.forms = {};
+        // Normalize both field names so all filters work
+        if (student.teacher_id && !student.teacherId) student.teacherId = student.teacher_id;
+        if (student.teacherId && !student.teacher_id) student.teacher_id = student.teacherId;
       });
       
       STATE.data.students = students;
