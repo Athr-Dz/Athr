@@ -6073,6 +6073,47 @@ document.addEventListener('submit', (e) => {
       id: 'pl-new-' + Date.now(), studentId: sid, term: 'الفصل الثاني 2026',
       goals: [], targetSkillIds: [], progress: [], notes: ''
     });
+    
+    // Save to Supabase
+    (async () => {
+      try {
+        const { data: newStudent, error: studError } = await window.supabaseAdmin
+          .from('students')
+          .insert({
+            name,
+            grade: `${stage} ${section}`,
+            age: 7,
+            color,
+            initials,
+            teacher_id: STATE.user.id,
+            school_id: STATE.user.school_id,
+            parent_name: parentName,
+            parent_phone: phoneNormalized,
+            invite_code: inviteCode,
+            enrolled: today,
+            schedule: [],
+            forms: {},
+          })
+          .select()
+          .single();
+        
+        if (studError) {
+          console.error('Error saving student to Supabase:', studError);
+          toast('تم الحفظ محلياً فقط - تحقق من الاتصال', 'warn');
+        } else {
+          // Update local ID with Supabase ID
+          const localSt = STATE.data.students.find(s => s.id === sid);
+          if (localSt) { localSt.id = newStudent.id; localSt.teacher_id = STATE.user.id; }
+          const localPlan = STATE.data.plans.find(p => p.studentId === sid);
+          if (localPlan) localPlan.studentId = newStudent.id;
+          persistState();
+          console.log('✅ Student saved to Supabase:', newStudent.id);
+        }
+      } catch(e) {
+        console.error('Supabase insert error:', e);
+      }
+    })();
+    
     persistState();
     closeModal();
     toast('تمت إضافة الطالبة ✨ أرسلي رابط الدعوة لولي الأمر');
@@ -10539,8 +10580,34 @@ function openAddFollowupModal(sid) {
 
   const goalOptions = (goals) => {
     const list = goals.length > 0 ? goals : allGoals;
+    // Goals can be strings OR objects with {text} OR groups with {shorts:[]}
+    const flatGoals = [];
+    list.forEach(g => {
+      if (typeof g === 'string') {
+        flatGoals.push({ id: g, label: g });
+      } else if (g && g.shorts && Array.isArray(g.shorts)) {
+        g.shorts.forEach(s => {
+          const text = typeof s === 'string' ? s : (s.text || s.goal || JSON.stringify(s));
+          flatGoals.push({ id: text, label: text });
+        });
+      } else if (g && (g.text || g.goal)) {
+        const text = g.text || g.goal;
+        flatGoals.push({ id: g.id || text, label: text });
+      }
+    });
+    if (flatGoals.length === 0 && allGoals.length > 0) {
+      // Fallback: try extracting from allGoals
+      allGoals.forEach(g => {
+        if (typeof g === 'string') flatGoals.push({ id: g, label: g });
+        else if (g && g.shorts) g.shorts.forEach(s => {
+          const t = typeof s === 'string' ? s : (s.text || s.goal || '');
+          if (t) flatGoals.push({ id: t, label: t });
+        });
+        else if (g && (g.text || g.goal)) flatGoals.push({ id: g.id || g.text, label: g.text || g.goal });
+      });
+    }
     return `<option value="">-- اختر هدف --</option>` +
-      list.map(g => `<option value="${esc(g.id || g.text || g)}">${esc(g.text || g.goal || g)}</option>`).join('');
+      flatGoals.map(g => `<option value="${esc(g.id)}">${esc(g.label)}</option>`).join('');
   };
 
   const teachingGoalOptions = `
