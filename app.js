@@ -761,12 +761,12 @@ function renderTopBar() {
           ${u.role === 'principal' ? `
             <div class="school-principal">
               ${I.medal}
-              <span>${esc(STATE.config.school.principal.name)} • ${esc(STATE.config.school.principal.title)}</span>
+              <span>${esc(u.name)} • مديرة المدرسة</span>
             </div>
           ` : u.role === 'teacher' ? `
             <div class="school-principal">
               ${I.user}
-              <span>${esc(u.name)} • ${esc(u.title || 'معلمة')}</span>
+              <span>${esc(u.name)} • ${esc(u.teacher_type === 'speech_therapy' ? 'معلمة نطق' : u.teacher_type === 'special_education' ? 'معلمة تربية خاصة' : u.title || 'معلمة')}</span>
             </div>
           ` : ''}
         </div>
@@ -8522,7 +8522,16 @@ function openSpecialEdSessionModal(sid, sessionIdx = null) {
           </div>
         `).join('')}
       </div>
-      <button type="button" class="btn ghost block" data-action="add-procedural-goal">
+      <button type="button" class="btn ghost block" onclick="
+        const container = document.getElementById('procedural-goals-container');
+        const idx = container.querySelectorAll('.procedural-goal-item').length;
+        const html = \`<div class='procedural-goal-item' style='border:1px solid var(--hair);border-radius:10px;padding:12px;margin-bottom:8px'>
+          <div class='field'><label>الهدف \${idx + 1}</label><textarea name='procedural_goal_\${idx}' rows='2' placeholder='اكتبي الهدف الإجرائي...' style='width:100%'></textarea></div>
+          <div class='field'><label>التقييم</label><select name='evaluation_\${idx}' style='width:100%'><option value='achieved'>تحقق</option><option value='partial'>تحقق جزئياً</option><option value='not_achieved'>لم يتحقق</option></select></div>
+          <button type='button' class='btn danger-soft sm mt-xs' onclick='this.closest(&quot;.procedural-goal-item&quot;).remove()'>حذف</button>
+        </div>\`;
+        container.insertAdjacentHTML('beforeend', html);
+      ">
         ${I.plus}<span>إضافة هدف إجرائي</span>
       </button>
       
