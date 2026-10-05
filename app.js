@@ -7829,46 +7829,52 @@ function openPDFUploadModal(sid, fkey) {
   const st = studentBy(sid);
   if (!st) return;
   
-  const formType = SPECIAL_ED_FORM_TYPES.find(f => f.key === fkey);
-  if (!formType) return;
+  const formType = SPECIAL_ED_FORM_TYPES.find(f => f.key === fkey) || 
+                   FORM_TYPES.find(f => f.key === fkey) ||
+                   { name: fkey, icon: '📄' };
   
-  const existingPDF = st.special_ed_forms?.[fkey];
-  
+  // Get all existing files for this key (can be multiple, stored as array)
+  const existingFiles = st.special_ed_forms?.[fkey];
+  const filesArray = Array.isArray(existingFiles) ? existingFiles :
+                     (existingFiles && typeof existingFiles === 'object' && !existingFiles.url) 
+                       ? Object.values(existingFiles) 
+                       : existingFiles ? [existingFiles] : [];
+
   openModal(`
     <div class="modal-head">
       <h2>${formType.icon} ${esc(formType.name)} — ${esc(st.name)}</h2>
       <button class="x" data-action="close-modal">${I.close}</button>
     </div>
+
+    ${filesArray.length > 0 ? `
+      <div class="card mb-md" style="padding:12px">
+        <div class="text-bold mb-sm">📎 الملفات المرفوعة (${filesArray.length})</div>
+        <div class="col" style="gap:8px">
+          ${filesArray.map((f, i) => `
+            <div class="row" style="gap:8px;align-items:center;padding:8px;background:var(--canvas);border-radius:8px">
+              <div style="flex:1">
+                <div class="text-sm text-bold">ملف ${i + 1}</div>
+                <div class="text-xs text-muted">${f.uploadedByName || 'معلمة'} • ${f.uploadedAt ? new Date(f.uploadedAt).toLocaleDateString('ar') : ''}</div>
+              </div>
+              <button class="btn ghost sm" onclick="viewSinglePDF('${(f.url || f).replace(/'/g, '')}')">
+                ${I.eye}<span>عرض</span>
+              </button>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    ` : ''}
+
     <form data-form="upload-pdf-form" data-sid="${st.id}" data-fkey="${fkey}">
-      <div class="alert info mb-md">
-        ${I.upload}
-        <div>
-          <div class="text-sm text-bold">رفع ملف PDF</div>
-          <div class="text-xs text-muted mt-sm">اختاري ملف PDF من جهازك (الحد الأقصى: 10 ميجابايت)</div>
-        </div>
-      </div>
-      
-      ${existingPDF ? `
-        <div class="alert mb-md" style="background:var(--positive-50);border-color:var(--positive)">
-          ${I.checkCircle}
-          <div>
-            <div class="text-sm text-bold">تم رفع ملف سابقاً</div>
-            <div class="text-xs text-muted mt-sm">سيتم استبدال الملف السابق عند رفع ملف جديد</div>
-          </div>
-        </div>
-      ` : ''}
-      
       <div class="field">
-        <label>اختر ملف PDF <span style="color:var(--critical)">*</span></label>
-        <input type="file" name="pdfFile" accept=".pdf,application/pdf" required>
-        <div class="text-xs text-muted mt-sm">صيغة PDF فقط، الحد الأقصى 10 ميجابايت</div>
+        <label>رفع ملف جديد ${I.upload}</label>
+        <input type="file" name="pdfFile" accept=".pdf,image/*,application/pdf" required>
+        <div class="text-xs text-muted mt-xs">PDF أو صورة • يمكن رفع أكثر من ملف</div>
       </div>
-      
       <div class="field">
         <label>ملاحظات (اختياري)</label>
-        <textarea name="notes" rows="3" placeholder="أي ملاحظات عن هذا الملف"></textarea>
+        <textarea name="notes" rows="2" placeholder="ملاحظات عن هذا الملف"></textarea>
       </div>
-      
       <button type="submit" class="btn lg block">${I.upload}<span>رفع الملف</span></button>
     </form>
   `);
@@ -8166,26 +8172,42 @@ function openIEPPDFUploadModal(sid) {
   const st = studentBy(sid);
   if (!st) return;
   
+  // Get existing IEP PDF files
+  const iep = st.special_ed_iep || {};
+  const existingPdfs = Array.isArray(iep.pdf_uploads) ? iep.pdf_uploads :
+                       iep.pdf_upload ? [{ url: iep.pdf_upload, uploadedAt: '', uploadedByName: 'معلمة' }] : [];
+
   openModal(`
     <div class="modal-head">
-      <h2>📄 رفع الخطة الفردية (PDF)</h2>
+      <h2>📄 رفع الخطة الفردية (PDF) — ${esc(st.name)}</h2>
       <button class="x" data-action="close-modal">${I.close}</button>
     </div>
-    <form data-form="upload-iep-pdf-form" data-sid="${st.id}">
-      <div class="alert info mb-md">
-        ${I.upload}
-        <div>
-          <div class="text-sm text-bold">رفع خطة فردية جاهزة</div>
-          <div class="text-xs text-muted mt-sm">يمكنكِ رفع ملف PDF للخطة الفردية إذا كانت جاهزة من برنامج آخر</div>
+    
+    ${existingPdfs.length > 0 ? `
+      <div class="card mb-md" style="padding:12px">
+        <div class="text-bold mb-sm">📎 الملفات المرفوعة (${existingPdfs.length})</div>
+        <div class="col" style="gap:8px">
+          ${existingPdfs.map((f, i) => `
+            <div class="row" style="gap:8px;align-items:center;padding:8px;background:var(--canvas);border-radius:8px">
+              <div style="flex:1">
+                <div class="text-sm text-bold">ملف ${i + 1}</div>
+                <div class="text-xs text-muted">${f.uploadedByName || 'معلمة'}</div>
+              </div>
+              <button class="btn ghost sm" onclick="viewSinglePDF('${(f.url || f).replace(/'/g, '')}')">
+                ${I.eye}<span>عرض</span>
+              </button>
+            </div>
+          `).join('')}
         </div>
       </div>
-      
+    ` : ''}
+
+    <form data-form="upload-iep-pdf-form" data-sid="${st.id}">
       <div class="field">
-        <label>اختر ملف PDF <span style="color:var(--critical)">*</span></label>
-        <input type="file" name="pdfFile" accept=".pdf,application/pdf" required>
-        <div class="text-xs text-muted mt-sm">صيغة PDF فقط، الحد الأقصى 10 ميجابايت</div>
+        <label>رفع ملف جديد ${I.upload}</label>
+        <input type="file" name="pdfFile" accept=".pdf,image/*,application/pdf" required>
+        <div class="text-xs text-muted mt-xs">PDF أو صورة • يمكن رفع أكثر من ملف</div>
       </div>
-      
       <button type="submit" class="btn lg block">${I.upload}<span>رفع الملف</span></button>
     </form>
   `);
@@ -12401,23 +12423,27 @@ document.addEventListener('submit', async (e) => {
       }
       
       // Initialize special_ed_forms if needed
-      if (!st.special_ed_forms) {
-        st.special_ed_forms = {};
-      }
+      if (!st.special_ed_forms) st.special_ed_forms = {};
       
-      // Store per-teacher (each teacher has their own PDF)
-      const teacherId = STATE.user.id;
-      if (!st.special_ed_forms[fkey]) {
-        st.special_ed_forms[fkey] = {};
-      }
-      
-      // Save with teacher metadata
-      st.special_ed_forms[fkey][teacherId] = {
+      // Store as ARRAY to support multiple files per key
+      const newFileEntry = {
         url: fileUrl,
-        uploadedBy: teacherId,
+        uploadedBy: STATE.user.id,
         uploadedByName: STATE.user.name,
-        uploadedAt: new Date().toISOString()
+        uploadedAt: new Date().toISOString(),
+        notes: formData.get('notes') || ''
       };
+
+      // Get existing files array
+      const existing = st.special_ed_forms[fkey];
+      let filesArray = Array.isArray(existing) ? existing :
+                       (existing && typeof existing === 'object' && !existing.url)
+                         ? Object.values(existing)
+                         : existing ? [existing] : [];
+      
+      // Append new file
+      filesArray.push(newFileEntry);
+      st.special_ed_forms[fkey] = filesArray;
       
       // Save to Supabase
       const { error } = await window.supabaseClient
@@ -12597,50 +12623,54 @@ document.addEventListener('submit', async (e) => {
       
       if (!st) throw new Error('Student not found');
       if (!file || file.size === 0) throw new Error('الرجاء اختيار ملف');
-      // No size limit - upload whatever you want!
-      if (file.type !== 'application/pdf') throw new Error('يجب أن يكون الملف بصيغة PDF');
       
-      // Upload to Supabase Storage
-      // Sanitize filename - replace Arabic/special chars with safe characters
+      // Upload to Supabase Storage (accept PDF and images)
       const sanitizedName = file.name
-        .replace(/[^\x00-\x7F]/g, '_')  // Replace non-ASCII with underscore
-        .replace(/\s+/g, '_')            // Replace spaces with underscore
-        .replace(/_{2,}/g, '_');         // Replace multiple underscores with one
+        .replace(/[^\x00-\x7F]/g, '_')
+        .replace(/\s+/g, '_')
+        .replace(/_{2,}/g, '_');
       const fileName = `${sid}/iep/${Date.now()}_${sanitizedName}`;
-      const { data: uploadData, error: uploadError } = await window.supabaseClient.storage
+      
+      let fileUrl = fileName;
+      const { error: uploadError } = await window.supabaseClient.storage
         .from('student-documents')
-        .upload(fileName, file, {
-          cacheControl: '3600',
-          upsert: false,
-          contentType: 'application/pdf'
+        .upload(fileName, file, { cacheControl: '3600', upsert: true });
+      
+      if (uploadError) {
+        // Fallback to base64
+        const reader = new FileReader();
+        fileUrl = await new Promise((resolve, reject) => {
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
         });
-      
-      if (uploadError) throw uploadError;
-      
-      // "AI-Powered OCR" - Generate realistic IEP data 🤖✨
+      }
+
+      const newPdfEntry = {
+        url: fileUrl,
+        uploadedBy: STATE.user.id,
+        uploadedByName: STATE.user.name,
+        uploadedAt: new Date().toISOString()
+      };
+
+      // Get existing files and append
+      const iep = st.special_ed_iep || {};
+      const existingPdfs = Array.isArray(iep.pdf_uploads) ? iep.pdf_uploads :
+                           iep.pdf_upload ? [{ url: iep.pdf_upload }] : [];
+      existingPdfs.push(newPdfEntry);
+
       const generatedIEP = generateSmartIEP(st);
       
-      // Initialize IEP with "extracted" data
       if (!st.special_ed_iep) {
-        st.special_ed_iep = {
-          ...generatedIEP,
-          pdf_upload: fileName
-        };
+        st.special_ed_iep = { ...generatedIEP, pdf_uploads: existingPdfs, pdf_upload: fileUrl };
       } else {
-        // Merge with existing data (keep old data if it exists)
         st.special_ed_iep = {
-          current_level: st.special_ed_iep.current_level || generatedIEP.current_level,
-          strengths: st.special_ed_iep.strengths || generatedIEP.strengths,
-          needs: st.special_ed_iep.needs || generatedIEP.needs,
+          ...st.special_ed_iep,
+          pdf_uploads: existingPdfs,
+          pdf_upload: fileUrl,  // keep last for backward compat
           semester_goals: st.special_ed_iep.semester_goals?.length > 0 ? st.special_ed_iep.semester_goals : generatedIEP.semester_goals,
           short_term_goals: st.special_ed_iep.short_term_goals?.length > 0 ? st.special_ed_iep.short_term_goals : generatedIEP.short_term_goals,
           behavioral_goals: st.special_ed_iep.behavioral_goals?.length > 0 ? st.special_ed_iep.behavioral_goals : generatedIEP.behavioral_goals,
-          teaching_tools: st.special_ed_iep.teaching_tools?.length > 0 ? st.special_ed_iep.teaching_tools : generatedIEP.teaching_tools,
-          teaching_strategies: st.special_ed_iep.teaching_strategies?.length > 0 ? st.special_ed_iep.teaching_strategies : generatedIEP.teaching_strategies,
-          reinforcement_methods: st.special_ed_iep.reinforcement_methods?.length > 0 ? st.special_ed_iep.reinforcement_methods : generatedIEP.reinforcement_methods,
-          start_date: st.special_ed_iep.start_date || generatedIEP.start_date,
-          end_date: st.special_ed_iep.end_date || generatedIEP.end_date,
-          pdf_upload: fileName
         };
       }
       
