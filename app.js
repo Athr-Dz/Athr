@@ -13284,112 +13284,136 @@ async function loadDataFromSupabase() {
     const startTime = performance.now();
     console.log('🔄 Loading data for user:', STATE.user.role, STATE.user.email);
     
-    // ⚡ OPTIMIZED: Load all data in parallel using Promise.all
+    // ⚡ OPTIMIZED: Load data in 2 batches to prevent overwhelming the database
+    // Batch 1: Core data (most important)
+    const batch1Start = performance.now();
     const [
       usersResponse,
       studentsResponse,
+      plansResponse,
+      attendanceResponse
+    ] = await Promise.all([
+      window.supabaseClient
+        .from('users')
+        .select('*')
+        .eq('school_id', STATE.user.school_id)
+        .catch(err => ({ data: null, error: err })),
+      
+      (async () => {
+        try {
+          let query = window.supabaseClient
+            .from('students')
+            .select('*')
+            .eq('school_id', STATE.user.school_id);
+          
+          if (STATE.user.role === 'student') {
+            query = query.eq('id', STATE.user.id);
+          }
+          return await query;
+        } catch(err) {
+          console.error('Error loading students:', err);
+          return { data: null, error: err };
+        }
+      })(),
+      
+      window.supabaseClient
+        .from('plans')
+        .select('*')
+        .eq('school_id', STATE.user.school_id)
+        .catch(err => ({ data: null, error: err })),
+      
+      (async () => {
+        try {
+          let query = window.supabaseClient.from('attendance').select('*');
+          if (STATE.user.role === 'student') {
+            query = query.eq('student_id', STATE.user.id);
+          }
+          if (STATE.user.role === 'parent' && STATE.user.student_id) {
+            query = query.eq('student_id', STATE.user.student_id);
+          }
+          return await query;
+        } catch(err) {
+          return { data: null, error: err };
+        }
+      })()
+    ]);
+    
+    console.log(`⏱️ Batch 1 (core data) completed in ${Math.round(performance.now() - batch1Start)}ms`);
+    
+    // Batch 2: Secondary data
+    const batch2Start = performance.now();
+    const [
       activitiesResponse,
       sessionLogsResponse,
-      plansResponse,
       messagesResponse,
       libraryResponse,
       sentLibraryResponse,
-      attendanceResponse,
       followupsResponse,
       memoryTestsResponse,
       reportsResponse
     ] = await Promise.all([
-      // Load users
-      window.supabaseClient
-        .from('users')
-        .select('*')
-        .eq('school_id', STATE.user.school_id),
-      
-      // Load students
       (async () => {
-        let query = window.supabaseClient
-          .from('students')
-          .select('*')
-          .eq('school_id', STATE.user.school_id);
-        
-        if (STATE.user.role === 'student') {
-          query = query.eq('id', STATE.user.id);
+        try {
+          let query = window.supabaseClient
+            .from('activities')
+            .select('*')
+            .eq('school_id', STATE.user.school_id);
+          
+          if (STATE.user.role === 'teacher') {
+            query = query.eq('teacher_id', STATE.user.id);
+          }
+          return await query;
+        } catch(err) {
+          return { data: null, error: err };
         }
-        return await query;
       })(),
       
-      // Load activities
       (async () => {
-        let query = window.supabaseClient
-          .from('activities')
-          .select('*')
-          .eq('school_id', STATE.user.school_id);
-        
-        if (STATE.user.role === 'teacher') {
-          query = query.eq('teacher_id', STATE.user.id);
+        try {
+          let query = window.supabaseClient
+            .from('session_logs')
+            .select('*')
+            .eq('school_id', STATE.user.school_id);
+          
+          if (STATE.user.role === 'teacher') {
+            query = query.eq('teacher_id', STATE.user.id);
+          }
+          if (STATE.user.role === 'student') {
+            query = query.eq('student_id', STATE.user.id);
+          }
+          return await query;
+        } catch(err) {
+          return { data: null, error: err };
         }
-        return await query;
       })(),
       
-      // Load session logs
-      (async () => {
-        let query = window.supabaseClient
-          .from('session_logs')
-          .select('*')
-          .eq('school_id', STATE.user.school_id);
-        
-        if (STATE.user.role === 'teacher') {
-          query = query.eq('teacher_id', STATE.user.id);
-        }
-        if (STATE.user.role === 'student') {
-          query = query.eq('student_id', STATE.user.id);
-        }
-        return await query;
-      })(),
-      
-      // Load plans
-      window.supabaseClient
-        .from('plans')
-        .select('*')
-        .eq('school_id', STATE.user.school_id),
-      
-      // Load messages (will be filtered after students load)
       window.supabaseClient
         .from('messages')
         .select('*')
-        .eq('school_id', STATE.user.school_id),
+        .eq('school_id', STATE.user.school_id)
+        .catch(err => ({ data: null, error: err })),
       
-      // Load library
       window.supabaseClient
         .from('library')
         .select('*')
-        .eq('school_id', STATE.user.school_id),
+        .eq('school_id', STATE.user.school_id)
+        .catch(err => ({ data: null, error: err })),
       
-      // Load sent library items
       (async () => {
-        let query = window.supabaseClient.from('sentLibraryItems').select('*');
-        if (STATE.user.role === 'teacher') {
-          query = query.eq('sentBy', STATE.user.id);
+        try {
+          let query = window.supabaseClient.from('sentLibraryItems').select('*');
+          if (STATE.user.role === 'teacher') {
+            query = query.eq('sentBy', STATE.user.id);
+          }
+          if (STATE.user.role === 'parent' && STATE.user.studentId) {
+            query = query.eq('studentId', STATE.user.studentId);
+          }
+          return await query;
+        } catch(err) {
+          return { data: null, error: err };
         }
-        if (STATE.user.role === 'parent' && STATE.user.studentId) {
-          query = query.eq('studentId', STATE.user.studentId);
-        }
-        return await query;
       })(),
       
-      // Load attendance
-      (async () => {
-        let query = window.supabaseClient.from('attendance').select('*');
-        if (STATE.user.role === 'student') {
-          query = query.eq('student_id', STATE.user.id);
-        }
-        if (STATE.user.role === 'parent' && STATE.user.student_id) {
-          query = query.eq('student_id', STATE.user.student_id);
-        }
-        return await query;
-      })(),
-      
-      // Load student followups
       (async () => {
         try {
           let query = window.supabaseClient.from('student_followups').select('*');
@@ -13405,7 +13429,6 @@ async function loadDataFromSupabase() {
         }
       })(),
       
-      // Load auditory memory tests
       (async () => {
         try {
           let query = window.supabaseClient.from('auditory_memory_tests').select('*');
@@ -13421,7 +13444,6 @@ async function loadDataFromSupabase() {
         }
       })(),
       
-      // Load initial reports
       (async () => {
         try {
           let query = window.supabaseClient.from('initial_reports').select('*');
@@ -13438,8 +13460,10 @@ async function loadDataFromSupabase() {
       })()
     ]);
     
+    console.log(`⏱️ Batch 2 (secondary data) completed in ${Math.round(performance.now() - batch2Start)}ms`);
+    
     const dataLoadTime = performance.now();
-    console.log(`⏱️ Database queries completed in ${Math.round(dataLoadTime - startTime)}ms`);
+    console.log(`⏱️ All database queries completed in ${Math.round(dataLoadTime - startTime)}ms`);
     
     // Process users
     if (usersResponse.data) {
@@ -13448,6 +13472,8 @@ async function loadDataFromSupabase() {
         principal_notes: Array.isArray(u.principal_notes) ? u.principal_notes : [],
       }));
       console.log('✅ Loaded users:', usersResponse.data.length);
+    } else if (usersResponse.error) {
+      console.error('❌ Error loading users:', usersResponse.error);
     }
     
     // Process students
@@ -13482,6 +13508,9 @@ async function loadDataFromSupabase() {
           });
         }
       });
+    } else if (studentsResponse.error) {
+      console.error('❌ Error loading students:', studentsResponse.error);
+      toast('حدث خطأ في تحميل بيانات الطالبات - يرجى تحديث الصفحة', 'error');
     }
     
     // Process activities
