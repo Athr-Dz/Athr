@@ -69,8 +69,9 @@ var setupTypingIndicator, openMemoryTestModal, viewMemoryTestModal;
 var openInitialReportModal, viewInitialReportModal, printInitialReport;
 
 function arNum(n) {
-  // Use Latin (Western Arabic) numerals — cleaner with the editorial typography
-  return String(n);
+  // Convert to Arabic-Indic (Hijri/Eastern Arabic) numerals
+  const ar = ['٠','١','٢','٣','٤','٥','٦','٧','٨','٩'];
+  return String(n).split('').map(d => /\d/.test(d) ? ar[+d] : d).join('');
 }
 function getPeriodLabel(period) {
   const labels = {
@@ -1945,6 +1946,9 @@ function renderSpecialEdIEP(st) {
       <button class="btn soft sm" data-action="edit-special-ed-iep" data-sid="${st.id}">${I.edit}<span>تعديل</span></button>
       <button class="btn ghost sm" data-action="print-special-ed-iep" data-sid="${st.id}">${I.download}<span>طباعة</span></button>
       <button class="btn ghost sm" data-action="upload-iep-pdf" data-sid="${st.id}">${I.upload}<span>رفع ملف آخر</span></button>
+      ${iep.pdf_uploads && iep.pdf_uploads.length > 0 ? `
+        <button class="btn ghost sm" data-action="view-all-iep-pdfs" data-sid="${st.id}">${I.eye}<span>عرض جميع الملفات (${arNum(iep.pdf_uploads.length)})</span></button>
+      ` : ''}
       <button class="btn danger-soft sm" data-action="delete-special-ed-iep" data-sid="${st.id}">${I.trash}<span>حذف الخطة</span></button>
     </div>
 
@@ -5204,6 +5208,12 @@ document.addEventListener('click', async (e) => {
       viewSinglePDF(url);
       return;
     }
+    if (a === 'download-pdf') {
+      const url = action.getAttribute('data-url');
+      const name = action.getAttribute('data-name') || 'document.pdf';
+      downloadPDF(url, name);
+      return;
+    }
     if (a === 'manage-notes') {
       const sid = action.getAttribute('data-sid');
       openStudentNotesModal(sid);
@@ -5243,6 +5253,45 @@ document.addEventListener('click', async (e) => {
     if (a === 'view-principal-iep-pdf') {
       const sid = action.getAttribute('data-sid');
       viewIEPPDF(sid);
+      return;
+    }
+    if (a === 'view-all-iep-pdfs') {
+      const sid = action.getAttribute('data-sid');
+      viewAllIEPPDFsModal(sid);
+      return;
+    }
+    if (a === 'delete-iep-pdf-upload') {
+      const sid = action.getAttribute('data-sid');
+      const idx = parseInt(action.getAttribute('data-idx'), 10);
+      const st = studentBy(sid);
+      if (!st || !st.special_ed_iep?.pdf_uploads) return;
+      const arr = st.special_ed_iep.pdf_uploads;
+      arr.splice(idx, 1);
+      st.special_ed_iep.pdf_uploads = arr;
+      // Update backward compat field
+      st.special_ed_iep.pdf_upload = arr.length > 0 ? arr[arr.length - 1].url : null;
+      (async () => {
+        const { error } = await window.supabaseClient
+          .from('students')
+          .update({ special_ed_iep: st.special_ed_iep })
+          .eq('id', sid);
+        if (error) { toast('حدث خطأ أثناء الحذف', 'error'); return; }
+        persistState();
+        toast('تم حذف الملف');
+        if (arr.length > 0) viewAllIEPPDFsModal(sid);
+        else { closeModal(); handleRoute(); }
+      })();
+      return;
+    }
+    if (a === 'view-single-iep-pdf') {
+      const url = action.getAttribute('data-url');
+      viewSinglePDF(url);
+      return;
+    }
+    if (a === 'download-iep-pdf') {
+      const url = action.getAttribute('data-url');
+      const name = action.getAttribute('data-name') || 'iep.pdf';
+      downloadPDF(url, name);
       return;
     }
     if (a === 'print-special-ed-iep') {
@@ -7956,6 +8005,36 @@ async function viewSinglePDF(pdfUrl) {
   }
 }
 
+async function downloadPDF(pdfUrl, fileName = 'document.pdf') {
+  if (!pdfUrl) { toast('لا يوجد ملف', 'error'); return; }
+  try {
+    let downloadUrl = pdfUrl;
+    
+    // If it's a Supabase storage path (not a URL or data URI)
+    if (!pdfUrl.startsWith('http') && !pdfUrl.startsWith('data:')) {
+      const { data, error } = await window.supabaseClient.storage
+        .from('student-documents')
+        .createSignedUrl(pdfUrl, 3600);
+      if (error) throw error;
+      downloadUrl = data.signedUrl;
+    }
+    
+    // Create temporary link and trigger download
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = fileName;
+    link.target = '_blank';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    toast('✅ جاري تحميل الملف');
+  } catch (error) {
+    console.error('Error downloading PDF:', error);
+    toast('حدث خطأ أثناء تحميل الملف', 'error');
+  }
+}
+
 async function viewAllPDFsModal(sid, fkey) {
   const st = studentBy(sid);
   if (!st) return;
@@ -7984,9 +8063,14 @@ async function viewAllPDFsModal(sid, fkey) {
           ${I.trash}
         </button>
       </div>
-      <button class="btn soft sm block" data-action="view-single-pdf" data-url="${esc(upload.url)}">
-        ${I.eye}<span>عرض الملف</span>
-      </button>
+      <div class="row" style="gap:8px">
+        <button class="btn soft sm" style="flex:1" data-action="view-single-pdf" data-url="${esc(upload.url)}">
+          ${I.eye}<span>عرض الملف</span>
+        </button>
+        <button class="btn ghost sm" data-action="download-pdf" data-url="${esc(upload.url)}" data-name="${esc(upload.name || 'document.pdf')}">
+          ${I.download}<span>تحميل</span>
+        </button>
+      </div>
     </div>
   `).join('');
 
@@ -8401,6 +8485,56 @@ async function viewIEPPDF(sid) {
     console.error('Error viewing IEP PDF:', error);
     toast('حدث خطأ أثناء فتح الملف', 'error');
   }
+}
+
+async function viewAllIEPPDFsModal(sid) {
+  const st = studentBy(sid);
+  if (!st) return;
+  
+  const iep = st.special_ed_iep || {};
+  const uploads = Array.isArray(iep.pdf_uploads) ? iep.pdf_uploads :
+                  iep.pdf_upload ? [{ url: iep.pdf_upload, uploadedByName: 'معلمة', uploadedAt: '' }] : [];
+  
+  if (uploads.length === 0) {
+    toast('لا توجد ملفات محملة', 'error');
+    return;
+  }
+
+  const renderList = () => uploads.map((upload, idx) => `
+    <div class="card" style="padding:16px" id="iep-pdf-item-${idx}">
+      <div class="row between mb-sm">
+        <div>
+          <div class="text-bold">${esc(upload.uploadedByName || upload.name || 'ملف الخطة')}</div>
+          <div class="text-xs text-muted">${upload.uploadedAt ? fmtDate(upload.uploadedAt.split('T')[0]) : ''}</div>
+          ${upload.notes ? `<div class="text-xs text-muted mt-xs">${esc(upload.notes)}</div>` : ''}
+        </div>
+        <button class="btn danger-soft xs" data-action="delete-iep-pdf-upload" data-sid="${sid}" data-idx="${idx}">
+          ${I.trash}
+        </button>
+      </div>
+      <div class="row" style="gap:8px">
+        <button class="btn soft sm" style="flex:1" data-action="view-single-iep-pdf" data-url="${esc(upload.url)}">
+          ${I.eye}<span>عرض الملف</span>
+        </button>
+        <button class="btn ghost sm" data-action="download-iep-pdf" data-url="${esc(upload.url)}" data-name="${esc(upload.name || 'iep.pdf')}">
+          ${I.download}<span>تحميل</span>
+        </button>
+      </div>
+    </div>
+  `).join('');
+
+  openModal(`
+    <div class="modal-head">
+      <h2>📄 ملفات الخطة الفردية — ${esc(st.name)}</h2>
+      <button class="x" data-action="close-modal">${I.close}</button>
+    </div>
+    <div class="text-sm text-muted mb-md">
+      ${arNum(uploads.length)} ${uploads.length === 1 ? 'ملف مرفوع' : 'ملفات مرفوعة'}
+    </div>
+    <div class="stack gap-sm" id="iep-pdf-uploads-list">
+      ${renderList()}
+    </div>
+  `, { lg: true });
 }
 
 async function deleteSpecialEdIEP(sid) {
@@ -13149,51 +13283,170 @@ async function loadDataFromSupabase() {
   try {
     console.log('🔄 Loading data for user:', STATE.user.role, STATE.user.email);
     
-    // Load ALL users (teachers and parents) for everyone
-    // This ensures students can see their teacher info
-    const { data: users } = await window.supabaseClient
-      .from('users')
-      .select('*')
-      .eq('school_id', STATE.user.school_id);
+    // ⚡ OPTIMIZED: Load all data in parallel using Promise.all
+    const [
+      usersResponse,
+      studentsResponse,
+      activitiesResponse,
+      sessionLogsResponse,
+      plansResponse,
+      messagesResponse,
+      libraryResponse,
+      sentLibraryResponse,
+      followupsResponse,
+      memoryTestsResponse,
+      reportsResponse
+    ] = await Promise.all([
+      // Load users
+      window.supabaseClient
+        .from('users')
+        .select('*')
+        .eq('school_id', STATE.user.school_id),
+      
+      // Load students
+      (async () => {
+        let query = window.supabaseClient
+          .from('students')
+          .select('*')
+          .eq('school_id', STATE.user.school_id);
+        
+        if (STATE.user.role === 'student') {
+          query = query.eq('id', STATE.user.id);
+        }
+        return await query;
+      })(),
+      
+      // Load activities
+      (async () => {
+        let query = window.supabaseClient
+          .from('activities')
+          .select('*')
+          .eq('school_id', STATE.user.school_id);
+        
+        if (STATE.user.role === 'teacher') {
+          query = query.eq('teacher_id', STATE.user.id);
+        }
+        return await query;
+      })(),
+      
+      // Load session logs
+      (async () => {
+        let query = window.supabaseClient
+          .from('session_logs')
+          .select('*')
+          .eq('school_id', STATE.user.school_id);
+        
+        if (STATE.user.role === 'teacher') {
+          query = query.eq('teacher_id', STATE.user.id);
+        }
+        if (STATE.user.role === 'student') {
+          query = query.eq('student_id', STATE.user.id);
+        }
+        return await query;
+      })(),
+      
+      // Load plans
+      window.supabaseClient
+        .from('plans')
+        .select('*')
+        .eq('school_id', STATE.user.school_id),
+      
+      // Load messages (will be filtered after students load)
+      window.supabaseClient
+        .from('messages')
+        .select('*')
+        .eq('school_id', STATE.user.school_id),
+      
+      // Load library
+      window.supabaseClient
+        .from('library')
+        .select('*')
+        .eq('school_id', STATE.user.school_id),
+      
+      // Load sent library items
+      (async () => {
+        let query = window.supabaseClient.from('sentLibraryItems').select('*');
+        if (STATE.user.role === 'teacher') {
+          query = query.eq('sentBy', STATE.user.id);
+        }
+        if (STATE.user.role === 'parent' && STATE.user.studentId) {
+          query = query.eq('studentId', STATE.user.studentId);
+        }
+        return await query;
+      })(),
+      
+      // Load student followups
+      (async () => {
+        try {
+          let query = window.supabaseClient.from('student_followups').select('*');
+          if (STATE.user.role === 'teacher') {
+            query = query.eq('teacher_id', STATE.user.id);
+          } else if (STATE.user.role === 'student') {
+            query = query.eq('student_id', STATE.user.id);
+          }
+          return await query;
+        } catch(e) {
+          console.warn('student_followups table not ready:', e.message);
+          return { data: [], error: null };
+        }
+      })(),
+      
+      // Load auditory memory tests
+      (async () => {
+        try {
+          let query = window.supabaseClient.from('auditory_memory_tests').select('*');
+          if (STATE.user.role === 'teacher') {
+            query = query.eq('teacher_id', STATE.user.id);
+          } else if (STATE.user.role === 'student') {
+            query = query.eq('student_id', STATE.user.id);
+          }
+          return await query;
+        } catch(e) {
+          console.warn('auditory_memory_tests table not ready:', e.message);
+          return { data: [], error: null };
+        }
+      })(),
+      
+      // Load initial reports
+      (async () => {
+        try {
+          let query = window.supabaseClient.from('initial_reports').select('*');
+          if (STATE.user.role === 'teacher') {
+            query = query.eq('teacher_id', STATE.user.id);
+          } else if (STATE.user.role === 'student') {
+            query = query.eq('student_id', STATE.user.id);
+          }
+          return await query;
+        } catch(e) {
+          console.warn('initial_reports table not ready:', e.message);
+          return { data: [], error: null };
+        }
+      })()
+    ]);
     
-    if (users) {
-      // principal_notes is a jsonb column — ensure it's always an array
-      STATE.data.users = users.map(u => ({
+    // Process users
+    if (usersResponse.data) {
+      STATE.data.users = usersResponse.data.map(u => ({
         ...u,
         principal_notes: Array.isArray(u.principal_notes) ? u.principal_notes : [],
       }));
-      console.log('✅ Loaded users:', users.length);
+      console.log('✅ Loaded users:', usersResponse.data.length);
     }
     
-    // Load students
-    let studentsQuery = window.supabaseClient
-      .from('students')
-      .select('*')
-      .eq('school_id', STATE.user.school_id);
-    
-    // Students see only their own record
-    if (STATE.user.role === 'student') {
-      studentsQuery = studentsQuery.eq('id', STATE.user.id);
-    }
-    
-    // Teachers and principal see ALL students in the school — no teacher_id filter
-    
-    const { data: students } = await studentsQuery;
-    if (students) {
-      // ✅ FIX: Ensure forms is always an object, not an array
-      // ✅ FIX: Normalize teacher_id → teacherId for consistency
+    // Process students
+    if (studentsResponse.data) {
+      const students = studentsResponse.data;
       students.forEach(student => {
         if (Array.isArray(student.forms)) {
           student.forms = {};
         }
         if (!student.forms) student.forms = {};
-        // Normalize both field names so all filters work
         if (student.teacher_id && !student.teacherId) student.teacherId = student.teacher_id;
         if (student.teacherId && !student.teacher_id) student.teacher_id = student.teacherId;
       });
       
       STATE.data.students = students;
-      console.log('✅ Loaded students:', students.length, students);
+      console.log('✅ Loaded students:', students.length);
       
       // Create empty plans for students that don't have one
       students.forEach(student => {
@@ -13213,76 +13466,38 @@ async function loadDataFromSupabase() {
         }
       });
     }
-    if (students) STATE.data.students = students;
     
-    // Load activities
-    let activitiesQuery = window.supabaseClient
-      .from('activities')
-      .select('*')
-      .eq('school_id', STATE.user.school_id);
-    
-    // Teachers only see their own activities
-    if (STATE.user.role === 'teacher') {
-      activitiesQuery = activitiesQuery.eq('teacher_id', STATE.user.id);
+    // Process activities
+    if (activitiesResponse.data) {
+      STATE.data.activities = activitiesResponse.data;
+      console.log('✅ Loaded activities:', activitiesResponse.data.length);
     }
     
-    const { data: activities } = await activitiesQuery;
-    if (activities) STATE.data.activities = activities;
-    
-    // Load session logs
-    let sessionLogsQuery = window.supabaseClient
-      .from('session_logs')
-      .select('*')
-      .eq('school_id', STATE.user.school_id);
-    
-    // Teachers only see their own session logs
-    if (STATE.user.role === 'teacher') {
-      sessionLogsQuery = sessionLogsQuery.eq('teacher_id', STATE.user.id);
-    }
-    
-    // Students see their own session logs
-    if (STATE.user.role === 'student') {
-      sessionLogsQuery = sessionLogsQuery.eq('student_id', STATE.user.id);
-    }
-    
-    const { data: sessionLogs } = await sessionLogsQuery;
-    if (sessionLogs) {
-      // Transform Supabase format to app format
-      STATE.data.sessionLogs = sessionLogs.map(log => ({
+    // Process session logs
+    if (sessionLogsResponse.data) {
+      STATE.data.sessionLogs = sessionLogsResponse.data.map(log => ({
         id: log.id,
         studentId: log.student_id,
         teacherId: log.teacher_id,
         date: log.date,
-        time: '', // Not stored separately in Supabase
+        time: '',
         duration: log.duration,
         goalEvaluations: typeof log.activities === 'string' ? JSON.parse(log.activities) : log.activities,
         tools: [],
         notes: log.notes
       }));
+      console.log('✅ Loaded session logs:', sessionLogsResponse.data.length);
     }
     
-    // Load messages
-    let messagesQuery = window.supabaseClient
-      .from('messages')
-      .select('*')
-      .eq('school_id', STATE.user.school_id);
-    
-    // Load plans
-    let plansQuery = window.supabaseClient
-      .from('plans')
-      .select('*')
-      .eq('school_id', STATE.user.school_id);
-    
-    const { data: plans } = await plansQuery;
-    if (plans) {
-      console.log('📋 Loading plans from Supabase:', plans);
-      STATE.data.plans = plans.map(p => ({
+    // Process plans
+    if (plansResponse.data) {
+      STATE.data.plans = plansResponse.data.map(p => ({
         id: p.id,
         studentId: p.student_id,
         teacherId: p.teacher_id,
         title: p.title,
         goals: p.goals || [],
-        groups: p.goals || [], // Use goals as groups - they contain the same data structure
+        groups: p.goals || [],
         progress: p.progress || [],
         targetSkillIds: [],
         term: 'الفصل الثاني 2026',
@@ -13291,25 +13506,21 @@ async function loadDataFromSupabase() {
         generatedAt: p.created_at?.slice(0, 10),
         lastRegeneratedAt: p.last_regenerated_at
       }));
-      console.log('📋 Processed plans:', STATE.data.plans);
+      console.log('✅ Loaded plans:', plansResponse.data.length);
     }
     
-    // Teachers see messages for their students
-    if (STATE.user.role === 'teacher') {
-      const teacherStudentIds = students?.map(s => s.id) || [];
-      if (teacherStudentIds.length > 0) {
-        messagesQuery = messagesQuery.in('student_id', teacherStudentIds);
+    // Process messages with filtering
+    if (messagesResponse.data) {
+      let messages = messagesResponse.data;
+      
+      // Filter messages based on role
+      if (STATE.user.role === 'teacher') {
+        const teacherStudentIds = studentsResponse.data?.map(s => s.id) || [];
+        messages = messages.filter(m => teacherStudentIds.includes(m.student_id));
+      } else if (STATE.user.role === 'student') {
+        messages = messages.filter(m => m.student_id === STATE.user.id);
       }
-    }
-    
-    // Students see their own messages
-    if (STATE.user.role === 'student') {
-      messagesQuery = messagesQuery.eq('student_id', STATE.user.id);
-    }
-    
-    const { data: messages } = await messagesQuery;
-    if (messages) {
-      // Transform Supabase format to app format
+      
       STATE.data.messages = messages.map(msg => ({
         id: msg.id,
         studentId: msg.student_id,
@@ -13319,130 +13530,79 @@ async function loadDataFromSupabase() {
         time: msg.created_at?.slice(11, 16) || '',
         read: msg.read
       }));
+      console.log('✅ Loaded messages:', messages.length);
     }
     
-    console.log('✅ Data loaded from Supabase:', {
-      users: STATE.data.users?.length || 0,
-      students: students?.length || 0,
-      activities: activities?.length || 0,
-      sessionLogs: sessionLogs?.length || 0,
-      messages: messages?.length || 0,
-    });
-    
-    // Load library items
-    let libraryQuery = window.supabaseClient
-      .from('library')
-      .select('*')
-      .eq('school_id', STATE.user.school_id);
-    
-    const { data: library } = await libraryQuery;
-    if (library) {
-      STATE.data.library = library;
-      console.log('✅ Loaded library items:', library.length);
+    // Process library
+    if (libraryResponse.data) {
+      STATE.data.library = libraryResponse.data;
+      console.log('✅ Loaded library items:', libraryResponse.data.length);
     }
     
-    // Load sent library items
-    let sentLibraryQuery = window.supabaseClient
-      .from('sentLibraryItems')
-      .select('*');
-    
-    // Teachers see items they sent
-    if (STATE.user.role === 'teacher') {
-      sentLibraryQuery = sentLibraryQuery.eq('sentBy', STATE.user.id);
+    // Process sent library items
+    if (sentLibraryResponse.data) {
+      STATE.data.sentLibraryItems = sentLibraryResponse.data;
+      console.log('✅ Loaded sent library items:', sentLibraryResponse.data.length);
     }
     
-    // Parents see items sent to their child
-    if (STATE.user.role === 'parent' && STATE.user.studentId) {
-      sentLibraryQuery = sentLibraryQuery.eq('studentId', STATE.user.studentId);
+    // Process student followups
+    if (followupsResponse.data) {
+      STATE.data.studentFollowups = followupsResponse.data.map(f => ({
+        id: f.id,
+        studentId: f.student_id,
+        teacher_id: f.teacher_id,
+        date_from: f.date_from,
+        date_to: f.date_to,
+        plan_goals: f.plan_goals,
+        custom_goal: f.custom_goal,
+        tools: f.tools || [],
+        notes: f.notes,
+        created_at: f.created_at,
+        updated_at: f.updated_at
+      }));
+      console.log('✅ Loaded student followups:', followupsResponse.data.length);
+    } else {
+      STATE.data.studentFollowups = [];
     }
     
-    const { data: sentLibraryItems } = await sentLibraryQuery;
-    if (sentLibraryItems) {
-      STATE.data.sentLibraryItems = sentLibraryItems;
-      console.log('✅ Loaded sent library items:', sentLibraryItems.length);
+    // Process auditory memory tests
+    if (memoryTestsResponse.data) {
+      STATE.data.auditoryMemoryTests = memoryTestsResponse.data.map(t => ({
+        id: t.id,
+        studentId: t.student_id,
+        teacher_id: t.teacher_id,
+        test_type: t.test_type,
+        test_data: typeof t.test_data === 'string' ? JSON.parse(t.test_data) : (t.test_data || {}),
+        score: t.score,
+        total_score: t.total_score,
+        notes: t.notes,
+        tested_at: t.tested_at,
+        created_at: t.created_at
+      }));
+      console.log('✅ Loaded auditory memory tests:', memoryTestsResponse.data.length);
+    } else {
+      STATE.data.auditoryMemoryTests = [];
     }
     
-    // ========== LOAD NEW FEATURES DATA ==========
-
-    // Load student followups
-    try {
-      let followupsQuery = window.supabaseClient.from('student_followups').select('*');
-      if (STATE.user.role === 'teacher') {
-        followupsQuery = followupsQuery.eq('teacher_id', STATE.user.id);
-      } else if (STATE.user.role === 'student') {
-        followupsQuery = followupsQuery.eq('student_id', STATE.user.id);
-      }
-      const { data: followups, error: followupsError } = await followupsQuery;
-      if (!followupsError && followups) {
-        STATE.data.studentFollowups = followups.map(f => ({
-          id: f.id,
-          studentId: f.student_id,
-          teacher_id: f.teacher_id,
-          date_from: f.date_from,
-          date_to: f.date_to,
-          plan_goals: f.plan_goals,
-          custom_goal: f.custom_goal,
-          tools: f.tools || [],
-          notes: f.notes,
-          created_at: f.created_at,
-          updated_at: f.updated_at
-        }));
-        console.log('✅ Loaded student followups:', followups.length);
-      }
-    } catch(e) { console.warn('student_followups table not ready:', e.message); STATE.data.studentFollowups = []; }
-
-    // Load auditory memory tests
-    try {
-      let memoryTestsQuery = window.supabaseClient.from('auditory_memory_tests').select('*');
-      if (STATE.user.role === 'teacher') {
-        memoryTestsQuery = memoryTestsQuery.eq('teacher_id', STATE.user.id);
-      } else if (STATE.user.role === 'student') {
-        memoryTestsQuery = memoryTestsQuery.eq('student_id', STATE.user.id);
-      }
-      const { data: memoryTests, error: memoryError } = await memoryTestsQuery;
-      if (!memoryError && memoryTests) {
-        STATE.data.auditoryMemoryTests = memoryTests.map(t => ({
-          id: t.id,
-          studentId: t.student_id,
-          teacher_id: t.teacher_id,
-          test_type: t.test_type,
-          test_data: typeof t.test_data === 'string' ? JSON.parse(t.test_data) : (t.test_data || {}),
-          score: t.score,
-          total_score: t.total_score,
-          notes: t.notes,
-          tested_at: t.tested_at,
-          created_at: t.created_at
-        }));
-        console.log('✅ Loaded auditory memory tests:', memoryTests.length);
-      }
-    } catch(e) { console.warn('auditory_memory_tests table not ready:', e.message); STATE.data.auditoryMemoryTests = []; }
-
-    // Load initial reports
-    try {
-      let reportsQuery = window.supabaseClient.from('initial_reports').select('*');
-      if (STATE.user.role === 'teacher') {
-        reportsQuery = reportsQuery.eq('teacher_id', STATE.user.id);
-      } else if (STATE.user.role === 'student') {
-        reportsQuery = reportsQuery.eq('student_id', STATE.user.id);
-      }
-      const { data: reports, error: reportsError } = await reportsQuery;
-      if (!reportsError && reports) {
-        STATE.data.initialReports = reports.map(r => ({
-          id: r.id,
-          studentId: r.student_id,
-          teacher_id: r.teacher_id,
-          report_date: r.report_date,
-          introduction: r.introduction,
-          content: typeof r.content === 'string' ? JSON.parse(r.content) : (r.content || {}),
-          status: r.status,
-          created_at: r.created_at,
-          updated_at: r.updated_at
-        }));
-        console.log('✅ Loaded initial reports:', reports.length);
-      }
-    } catch(e) { console.warn('initial_reports table not ready:', e.message); STATE.data.initialReports = []; }
-
-    // ========== END LOAD NEW FEATURES DATA ==========
+    // Process initial reports
+    if (reportsResponse.data) {
+      STATE.data.initialReports = reportsResponse.data.map(r => ({
+        id: r.id,
+        studentId: r.student_id,
+        teacher_id: r.teacher_id,
+        report_date: r.report_date,
+        introduction: r.introduction,
+        content: typeof r.content === 'string' ? JSON.parse(r.content) : (r.content || {}),
+        status: r.status,
+        created_at: r.created_at,
+        updated_at: r.updated_at
+      }));
+      console.log('✅ Loaded initial reports:', reportsResponse.data.length);
+    } else {
+      STATE.data.initialReports = [];
+    }
+    
+    console.log('⚡ All data loaded in parallel successfully!');
     
     // Load attendance records
     let attendanceQuery = window.supabaseClient
