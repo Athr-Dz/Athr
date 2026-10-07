@@ -13293,12 +13293,21 @@ async function loadDataFromSupabase() {
       plansResponse,
       attendanceResponse
     ] = await Promise.all([
-      window.supabaseClient
-        .from('users')
-        .select('*')
-        .eq('school_id', STATE.user.school_id)
-        .catch(err => ({ data: null, error: err })),
+      // Load users
+      (async () => {
+        try {
+          const result = await window.supabaseClient
+            .from('users')
+            .select('*')
+            .eq('school_id', STATE.user.school_id);
+          return result;
+        } catch(err) {
+          console.error('Error loading users:', err);
+          return { data: null, error: err };
+        }
+      })(),
       
+      // Load students
       (async () => {
         try {
           let query = window.supabaseClient
@@ -13309,19 +13318,29 @@ async function loadDataFromSupabase() {
           if (STATE.user.role === 'student') {
             query = query.eq('id', STATE.user.id);
           }
-          return await query;
+          const result = await query;
+          return result;
         } catch(err) {
           console.error('Error loading students:', err);
           return { data: null, error: err };
         }
       })(),
       
-      window.supabaseClient
-        .from('plans')
-        .select('*')
-        .eq('school_id', STATE.user.school_id)
-        .catch(err => ({ data: null, error: err })),
+      // Load plans
+      (async () => {
+        try {
+          const result = await window.supabaseClient
+            .from('plans')
+            .select('*')
+            .eq('school_id', STATE.user.school_id);
+          return result;
+        } catch(err) {
+          console.error('Error loading plans:', err);
+          return { data: null, error: err };
+        }
+      })(),
       
+      // Load attendance
       (async () => {
         try {
           let query = window.supabaseClient.from('attendance').select('*');
@@ -13331,8 +13350,10 @@ async function loadDataFromSupabase() {
           if (STATE.user.role === 'parent' && STATE.user.student_id) {
             query = query.eq('student_id', STATE.user.student_id);
           }
-          return await query;
+          const result = await query;
+          return result;
         } catch(err) {
+          console.error('Error loading attendance:', err);
           return { data: null, error: err };
         }
       })()
@@ -13352,6 +13373,7 @@ async function loadDataFromSupabase() {
       memoryTestsResponse,
       reportsResponse
     ] = await Promise.all([
+      // Load activities
       (async () => {
         try {
           let query = window.supabaseClient
@@ -13362,12 +13384,15 @@ async function loadDataFromSupabase() {
           if (STATE.user.role === 'teacher') {
             query = query.eq('teacher_id', STATE.user.id);
           }
-          return await query;
+          const result = await query;
+          return result;
         } catch(err) {
+          console.error('Error loading activities:', err);
           return { data: null, error: err };
         }
       })(),
       
+      // Load session logs
       (async () => {
         try {
           let query = window.supabaseClient
@@ -13381,24 +13406,43 @@ async function loadDataFromSupabase() {
           if (STATE.user.role === 'student') {
             query = query.eq('student_id', STATE.user.id);
           }
-          return await query;
+          const result = await query;
+          return result;
         } catch(err) {
+          console.error('Error loading session logs:', err);
           return { data: null, error: err };
         }
       })(),
       
-      window.supabaseClient
-        .from('messages')
-        .select('*')
-        .eq('school_id', STATE.user.school_id)
-        .catch(err => ({ data: null, error: err })),
+      // Load messages
+      (async () => {
+        try {
+          const result = await window.supabaseClient
+            .from('messages')
+            .select('*')
+            .eq('school_id', STATE.user.school_id);
+          return result;
+        } catch(err) {
+          console.error('Error loading messages:', err);
+          return { data: null, error: err };
+        }
+      })(),
       
-      window.supabaseClient
-        .from('library')
-        .select('*')
-        .eq('school_id', STATE.user.school_id)
-        .catch(err => ({ data: null, error: err })),
+      // Load library
+      (async () => {
+        try {
+          const result = await window.supabaseClient
+            .from('library')
+            .select('*')
+            .eq('school_id', STATE.user.school_id);
+          return result;
+        } catch(err) {
+          console.error('Error loading library:', err);
+          return { data: null, error: err };
+        }
+      })(),
       
+      // Load sent library items
       (async () => {
         try {
           let query = window.supabaseClient.from('sentLibraryItems').select('*');
@@ -13408,8 +13452,10 @@ async function loadDataFromSupabase() {
           if (STATE.user.role === 'parent' && STATE.user.studentId) {
             query = query.eq('studentId', STATE.user.studentId);
           }
-          return await query;
+          const result = await query;
+          return result;
         } catch(err) {
+          console.error('Error loading sent library items:', err);
           return { data: null, error: err };
         }
       })(),
