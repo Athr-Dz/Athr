@@ -13281,6 +13281,7 @@ async function loadDataFromSupabase() {
   if (!window.supabaseClient || !STATE.user) return;
   
   try {
+    const startTime = performance.now();
     console.log('🔄 Loading data for user:', STATE.user.role, STATE.user.email);
     
     // ⚡ OPTIMIZED: Load all data in parallel using Promise.all
@@ -13293,6 +13294,7 @@ async function loadDataFromSupabase() {
       messagesResponse,
       libraryResponse,
       sentLibraryResponse,
+      attendanceResponse,
       followupsResponse,
       memoryTestsResponse,
       reportsResponse
@@ -13375,6 +13377,18 @@ async function loadDataFromSupabase() {
         return await query;
       })(),
       
+      // Load attendance
+      (async () => {
+        let query = window.supabaseClient.from('attendance').select('*');
+        if (STATE.user.role === 'student') {
+          query = query.eq('student_id', STATE.user.id);
+        }
+        if (STATE.user.role === 'parent' && STATE.user.student_id) {
+          query = query.eq('student_id', STATE.user.student_id);
+        }
+        return await query;
+      })(),
+      
       // Load student followups
       (async () => {
         try {
@@ -13423,6 +13437,9 @@ async function loadDataFromSupabase() {
         }
       })()
     ]);
+    
+    const dataLoadTime = performance.now();
+    console.log(`⏱️ Database queries completed in ${Math.round(dataLoadTime - startTime)}ms`);
     
     // Process users
     if (usersResponse.data) {
@@ -13545,6 +13562,20 @@ async function loadDataFromSupabase() {
       console.log('✅ Loaded sent library items:', sentLibraryResponse.data.length);
     }
     
+    // Process attendance
+    if (attendanceResponse.data) {
+      STATE.data.attendance = attendanceResponse.data.map(a => ({
+        id: a.id,
+        studentId: a.student_id,
+        date: a.attendance_date,
+        status: a.status,
+        teacherId: a.teacher_id,
+        createdAt: a.created_at,
+        updatedAt: a.updated_at
+      }));
+      console.log('✅ Loaded attendance records:', attendanceResponse.data.length);
+    }
+    
     // Process student followups
     if (followupsResponse.data) {
       STATE.data.studentFollowups = followupsResponse.data.map(f => ({
@@ -13602,41 +13633,15 @@ async function loadDataFromSupabase() {
       STATE.data.initialReports = [];
     }
     
-    console.log('⚡ All data loaded in parallel successfully!');
-    
-    // Load attendance records
-    let attendanceQuery = window.supabaseClient
-      .from('attendance')
-      .select('*');
-    
-    // Students see their own attendance
-    if (STATE.user.role === 'student') {
-      attendanceQuery = attendanceQuery.eq('student_id', STATE.user.id);
-    }
-    
-    // Parents see their child's attendance
-    if (STATE.user.role === 'parent' && STATE.user.student_id) {
-      attendanceQuery = attendanceQuery.eq('student_id', STATE.user.student_id);
-    }
-    
-    // Teachers see all attendance for students in their school (RLS handles this)
-    
-    const { data: attendance } = await attendanceQuery;
-    if (attendance) {
-      STATE.data.attendance = attendance.map(a => ({
-        id: a.id,
-        studentId: a.student_id,
-        date: a.attendance_date,
-        status: a.status,
-        teacherId: a.teacher_id,
-        createdAt: a.created_at,
-        updatedAt: a.updated_at
-      }));
-      console.log('✅ Loaded attendance records:', attendance.length);
-    }
+    const processingTime = performance.now();
+    console.log(`⏱️ Data processing completed in ${Math.round(processingTime - dataLoadTime)}ms`);
+    console.log(`⚡ Total data loading time: ${Math.round(processingTime - startTime)}ms`);
     
     // ✅ Setup realtime subscriptions for messages
+    const realtimeStart = performance.now();
     setupRealtimeSubscriptions();
+    console.log(`⏱️ Realtime setup started (async) after ${Math.round(realtimeStart - startTime)}ms from start`);
+    
   } catch (error) {
     console.error('Error loading data:', error);
   }
