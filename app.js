@@ -1,4 +1,4 @@
-/* =========================================================
+﻿/* =========================================================
    منصة أروى — App (router, state, views)
    ========================================================= */
 
@@ -754,7 +754,7 @@ function renderTopBar() {
   return `
     <header class="topbar">
       <div class="brand">
-        <div class="brand-name">أثر</div>
+        <div class="brand-name">مدار</div>
         <div class="brand-divider"></div>
         <div class="school-block">
           <div class="school-name">${esc(STATE.config.school.name)}</div>
@@ -901,7 +901,7 @@ function renderLogin() {
       <div class="login-clean-card">
         <div class="login-clean-head">
           <div class="login-clean-logo">أ</div>
-          <h1 class="login-clean-title">أثر</h1>
+          <h1 class="login-clean-title">مدار</h1>
           <div class="login-clean-sub">نظام متابعة الطالبات</div>
         </div>
 
@@ -928,7 +928,7 @@ function renderLogin() {
         </form>
 
         <div class="login-clean-foot">
-          منصة أثر للتربية الخاصة
+          منصة مدار للتربية الخاصة
         </div>
       </div>
     </div>
@@ -972,7 +972,7 @@ function renderInvitePage(rawCode) {
         <div class="login-card">
           <div class="brand-big">
             <div class="logo">أ</div>
-            <div><h1>أثر</h1><div class="tag">رابط الدعوة</div></div>
+            <div><h1>مدار</h1><div class="tag">رابط الدعوة</div></div>
           </div>
           <div class="empty">
             <div class="ico">${I.search}</div>
@@ -996,7 +996,7 @@ function renderInvitePage(rawCode) {
         <div class="brand-big">
           <div class="logo">أ</div>
           <div>
-            <h1>أثر</h1>
+            <h1>مدار</h1>
             <div class="tag">${esc(STATE.config.school.name)}</div>
           </div>
         </div>
@@ -1073,7 +1073,7 @@ async function logout() {
    ========================================================= */
 function viewTeacherDashboard() {
   const me = STATE.user;
-  const myStudents = STATE.data.students.filter(s => !s.archived); // Show ALL students, not just mine
+  const myStudents = STATE.data.students.filter(s => !s.archived); 
   const todayDate = new Date(); // Use current date instead of MOCK.today
   const params = new URLSearchParams((location.hash.split('?')[1]) || '');
   const requestedDay = params.get('d');
@@ -1306,7 +1306,7 @@ function viewTeacherStudents() {
   const params = new URLSearchParams((location.hash.split('?')[1]) || '');
   const q = (params.get('q') || '').trim();
   const allMine = STATE.data.students
-    .filter(s => !s.archived) // Show ALL students, not just mine
+    .filter(s => !s.archived) 
     .sort((a, b) => gradeSortKey(a.grade) - gradeSortKey(b.grade));
 
   const matches = (s) => {
@@ -1345,7 +1345,7 @@ function viewTeacherStudents() {
         <div class="row" style="gap:18px;align-items:flex-start;flex-wrap:wrap">
           <div style="font-size:48px">🌿</div>
           <div style="flex:1;min-width:220px">
-            <h3>أهلاً بكِ في أثر</h3>
+            <h3>أهلاً بكِ في مدار</h3>
             <p class="text-sm text-muted mt-sm">${canAddStudents ? 'ابدئي بإضافة طالبتك الأولى — سيُولَّد لها رابط دعوة لولي الأمر تلقائياً.' : 'لا توجد طالبات مسجلات لك حالياً. تواصلي مع المديرة لإضافة طالبات.'}</p>
             ${canAddStudents ? `
               <ul class="onboarding-steps mt-md">
@@ -1439,6 +1439,7 @@ function viewStudentProfile(id, role) {
   return `
     <div class="page-head">
       <button class="btn ghost sm" data-action="back">${I.back}<span>عودة</span></button>
+      <button class="btn ghost sm" onclick="exportStudentPDF('${st.id}')">${I.download}<span>تصدير PDF</span></button>
     </div>
 
     <div class="student-hero-card ${sc}">
@@ -1564,7 +1565,7 @@ function buildInviteMessage(st) {
   return [
     `السلام عليكم ${parent?.name || ''} 🌿`,
     ``,
-    `تم إنشاء صفحة *${st.name}* في منصة "أثر" — ${STATE.config.school.name}.`,
+    `تم إنشاء صفحة *${st.name}* في منصة "مدار" — ${STATE.config.school.name}.`,
     ``,
     `من خلال الصفحة بإمكانكِ:`,
     `• متابعة جلسات الطفلة يومياً`,
@@ -1635,7 +1636,7 @@ function viewStudentReport(id) {
         <div class="report-brand">
           <div class="logo">أ</div>
           <div>
-            <div class="brand-name">أثر</div>
+            <div class="brand-name">مدار</div>
             <div class="text-xs text-muted">${esc(sch.name)}</div>
           </div>
         </div>
@@ -1782,21 +1783,17 @@ function renderFormsTab(st) {
           data = st.shared_initial_data || {};
           completed = data.completed || false;
         } else if (ft.isPDF) {
-          // PDF forms - check special_ed_forms (per-teacher storage)
-          const teacherId = STATE.user.id;
-          const pdfData = st.special_ed_forms?.[ft.key];
-          
-          // Check if current teacher has uploaded a file
-          const myPdfUrl = pdfData?.[teacherId];
-          completed = !!myPdfUrl;
-          
-          // Count total uploads from all teachers
-          const totalUploads = pdfData ? Object.keys(pdfData).length : 0;
-          
-          data = { 
-            pdfUrl: myPdfUrl,
-            totalUploads: totalUploads,
-            hasMyUpload: completed  // Track if current teacher uploaded
+          // PDF forms - check special_ed_forms (array of uploads)
+          const raw = st.special_ed_forms?.[ft.key];
+          // Normalize to array regardless of storage format
+          const filesArray = Array.isArray(raw) ? raw :
+                             (raw && typeof raw === 'object' && !raw.url) ? Object.values(raw) :
+                             raw ? [raw] : [];
+          completed = filesArray.length > 0;
+          data = {
+            filesArray,
+            totalUploads: filesArray.length,
+            hasMyUpload: filesArray.some(f => f.uploadedBy === STATE.user.id)
           };
         } else if (ft.isNotes) {
           // Student notes - check special_ed_forms.student_notes
@@ -1832,7 +1829,7 @@ function renderFormsTab(st) {
               ? `<div class="form-card-score">${arNum(data.score)}<span>/100</span></div>`
               : `<p class="form-card-sub">${esc(ft.sub)}</p>`}
             ${ft.isPDF && data.totalUploads > 0
-              ? `<p class="form-card-sub">${arNum(data.totalUploads)} ملف من ${data.totalUploads === 1 ? 'معلمة' : 'معلمات'}</p>`
+              ? `<p class="form-card-sub">${arNum(data.totalUploads)} ${data.totalUploads === 1 ? 'ملف مرفوع' : 'ملفات مرفوعة'}</p>`
               : ft.isNotes && completed
               ? `<p class="form-card-sub">${arNum(data.notes.length)} ملاحظة</p>`
               : ''}
@@ -1947,9 +1944,7 @@ function renderSpecialEdIEP(st) {
       </div>
       <button class="btn soft sm" data-action="edit-special-ed-iep" data-sid="${st.id}">${I.edit}<span>تعديل</span></button>
       <button class="btn ghost sm" data-action="print-special-ed-iep" data-sid="${st.id}">${I.download}<span>طباعة</span></button>
-      ${iep.pdf_upload ? `
-        <button class="btn ghost sm" data-action="view-iep-pdf" data-sid="${st.id}">${I.eye}<span>عرض PDF</span></button>
-      ` : ''}
+      <button class="btn ghost sm" data-action="upload-iep-pdf" data-sid="${st.id}">${I.upload}<span>رفع ملف آخر</span></button>
       <button class="btn danger-soft sm" data-action="delete-special-ed-iep" data-sid="${st.id}">${I.trash}<span>حذف الخطة</span></button>
     </div>
 
@@ -2782,7 +2777,7 @@ function attendanceCard(st) {
 
 function viewAttendance() {
   const me = STATE.user;
-  const myStudents = STATE.data.students.filter(s => !s.archived); // Show ALL students
+  const myStudents = STATE.data.students.filter(s => !s.archived); 
   
   // Get selected month from URL params or default to current month
   const params = new URLSearchParams((location.hash.split('?')[1]) || '');
@@ -3024,7 +3019,7 @@ function viewActivities() {
    ========================================================= */
 function viewActivityCreate() {
   const me = STATE.user;
-  const myStudents = STATE.data.students.filter(s => !s.archived); // Show ALL students
+  const myStudents = STATE.data.students.filter(s => !s.archived); 
   const params = new URLSearchParams((location.hash.split('?')[1]) || '');
   const presetStudent = params.get('student');
   const presetType = params.get('type') || 'home';
@@ -4481,7 +4476,7 @@ function libraryCard(it, role) {
    ========================================================= */
 function viewProgressTeacher() {
   const me = STATE.user;
-  const myStudents = STATE.data.students.filter(s => !s.archived); // Show ALL students
+  const myStudents = STATE.data.students.filter(s => !s.archived); 
   const allProgress = myStudents.map(st => {
     const plan = STATE.data.plans.find(p => p.studentId === st.id);
     const avg = plan ? Math.round(plan.progress.reduce((a,p)=>a+p.current,0)/plan.progress.length) : 0;
@@ -4585,7 +4580,7 @@ function viewSettings(role) {
   const params = new URLSearchParams((location.hash.split('?')[1]) || '');
   const tab = params.get('tab') || 'profile';
 
-  const archivedCount = STATE.data.students.filter(s => s.archived).length; // Show ALL archived students
+  const archivedCount = STATE.data.students.filter(s => s.archived).length; 
   // Get notes from the teacher's own record in STATE.data.users
   const myRecord = STATE.data.users.find(uu => uu.id === u.id) || u;
   const notesCount = (myRecord.principal_notes || []).length;
@@ -4852,7 +4847,7 @@ function renderSettingsScheduleLink() {
 function renderSettingsArchive() {
   const me = STATE.user;
   const archived = STATE.data.students
-    .filter(s => s.archived) // Show ALL archived students
+    .filter(s => s.archived) 
     .sort((a,b) => (b.archivedAt || '').localeCompare(a.archivedAt || ''));
   return `
     <div class="card">
@@ -4906,7 +4901,7 @@ function renderSettingsDanger() {
     <div class="card mt-md">
       <div class="card-title"><h3>عن المنصة</h3></div>
       <div class="stack gap-sm text-sm">
-        <div class="row between"><span class="text-muted">الإصدار</span><span class="text-bold">أثر v0.7 — نموذج</span></div>
+        <div class="row between"><span class="text-muted">الإصدار</span><span class="text-bold">مدار v0.7 — نموذج</span></div>
         <div class="row between"><span class="text-muted">الطالبات</span><span class="text-bold">${arNum(STATE.data.students.filter(s => !s.archived).length)}</span></div>
         <div class="row between"><span class="text-muted">جلسات سجّلتها</span><span class="text-bold">${arNum(STATE.data.sessionLogs.filter(l => l.teacherId === STATE.user.id).length)}</span></div>
         <div class="row between"><span class="text-muted">حجم البيانات المحلية</span><span class="text-bold">~${arNum(Math.round((localStorage.getItem(STORAGE_KEY) || '').length / 1024))} KB</span></div>
@@ -5179,6 +5174,29 @@ document.addEventListener('click', async (e) => {
       const sid = action.getAttribute('data-sid');
       const fkey = action.getAttribute('data-fkey');
       viewAllPDFsModal(sid, fkey);
+      return;
+    }
+    if (a === 'delete-pdf-upload') {
+      const sid = action.getAttribute('data-sid');
+      const fkey = action.getAttribute('data-fkey');
+      const idx = parseInt(action.getAttribute('data-idx'), 10);
+      const st = studentBy(sid);
+      if (!st || !st.special_ed_forms?.[fkey]) return;
+      const raw = st.special_ed_forms[fkey];
+      const arr = Array.isArray(raw) ? raw : (raw && typeof raw === 'object' && !raw.url) ? Object.values(raw) : raw ? [raw] : [];
+      arr.splice(idx, 1);
+      st.special_ed_forms[fkey] = arr;
+      (async () => {
+        const { error } = await window.supabaseClient
+          .from('students')
+          .update({ special_ed_forms: st.special_ed_forms })
+          .eq('id', sid);
+        if (error) { toast('حدث خطأ أثناء الحذف', 'error'); return; }
+        persistState();
+        toast('تم حذف الملف');
+        if (arr.length > 0) viewAllPDFsModal(sid, fkey);
+        else { closeModal(); handleRoute(); }
+      })();
       return;
     }
     if (a === 'view-single-pdf') {
@@ -5507,7 +5525,7 @@ document.addEventListener('click', async (e) => {
           
           // Delete student's sessions
           await window.supabaseClient
-            .from('sessions')
+            .from('session_logs')
             .delete()
             .eq('student_id', sid);
           
@@ -6160,8 +6178,7 @@ document.addEventListener('submit', (e) => {
             grade: st.grade,
             age: st.age,
             parent_name: st.parentName,
-            parent_phone: st.parent_phone,
-            updated_at: new Date().toISOString()
+            parent_phone: st.parent_phone
           })
           .eq('id', sid);
         
@@ -7853,7 +7870,7 @@ function openPDFUploadModal(sid, fkey) {
           ${filesArray.map((f, i) => `
             <div class="row" style="gap:8px;align-items:center;padding:8px;background:var(--canvas);border-radius:8px">
               <div style="flex:1">
-                <div class="text-sm text-bold">ملف ${i + 1}</div>
+                <div class="text-sm text-bold">${esc(f.name || `ملف ${i + 1}`)}</div>
                 <div class="text-xs text-muted">${f.uploadedByName || 'معلمة'} • ${f.uploadedAt ? new Date(f.uploadedAt).toLocaleDateString('ar') : ''}</div>
               </div>
               <button class="btn ghost sm" onclick="viewSinglePDF('${(f.url || f).replace(/'/g, '')}')">
@@ -7867,15 +7884,15 @@ function openPDFUploadModal(sid, fkey) {
 
     <form data-form="upload-pdf-form" data-sid="${st.id}" data-fkey="${fkey}">
       <div class="field">
-        <label>رفع ملف جديد ${I.upload}</label>
-        <input type="file" name="pdfFile" accept=".pdf,image/*,application/pdf" required>
-        <div class="text-xs text-muted mt-xs">PDF أو صورة • يمكن رفع أكثر من ملف</div>
+        <label>رفع ملفات ${I.upload}</label>
+        <input type="file" name="pdfFile" accept=".pdf,image/*,application/pdf" multiple required>
+        <div class="text-xs text-muted mt-xs">PDF أو صورة • يمكن اختيار أكثر من ملف دفعة واحدة</div>
       </div>
       <div class="field">
         <label>ملاحظات (اختياري)</label>
-        <textarea name="notes" rows="2" placeholder="ملاحظات عن هذا الملف"></textarea>
+        <textarea name="notes" rows="2" placeholder="ملاحظات عن هذه الملفات"></textarea>
       </div>
-      <button type="submit" class="btn lg block">${I.upload}<span>رفع الملف</span></button>
+      <button type="submit" class="btn lg block">${I.upload}<span>رفع الملفات</span></button>
     </form>
   `);
 }
@@ -7944,39 +7961,45 @@ async function viewAllPDFsModal(sid, fkey) {
   if (!st) return;
   
   const formType = SPECIAL_ED_FORM_TYPES.find(f => f.key === fkey);
-  const pdfData = st.special_ed_forms?.[fkey] || {};
-  const uploads = Object.entries(pdfData).map(([teacherId, data]) => ({
-    teacherId,
-    ...data
-  }));
+  const raw = st.special_ed_forms?.[fkey] || [];
+  // Normalize to array
+  const uploads = Array.isArray(raw) ? raw :
+                  (raw && typeof raw === 'object' && !raw.url) ? Object.values(raw) :
+                  raw ? [raw] : [];
   
   if (uploads.length === 0) {
     toast('لا توجد ملفات محملة', 'error');
     return;
   }
-  
+
+  const renderList = () => uploads.map((upload, idx) => `
+    <div class="card" style="padding:16px" id="pdf-item-${idx}">
+      <div class="row between mb-sm">
+        <div>
+          <div class="text-bold">${esc(upload.uploadedByName || 'معلمة')}</div>
+          <div class="text-xs text-muted">${upload.uploadedAt ? fmtDate(upload.uploadedAt.split('T')[0]) : ''}</div>
+          ${upload.notes ? `<div class="text-xs text-muted mt-xs">${esc(upload.notes)}</div>` : ''}
+        </div>
+        <button class="btn danger-soft xs" data-action="delete-pdf-upload" data-sid="${sid}" data-fkey="${fkey}" data-idx="${idx}">
+          ${I.trash}
+        </button>
+      </div>
+      <button class="btn soft sm block" data-action="view-single-pdf" data-url="${esc(upload.url)}">
+        ${I.eye}<span>عرض الملف</span>
+      </button>
+    </div>
+  `).join('');
+
   openModal(`
     <div class="modal-head">
       <h2>📄 ${esc(formType?.name || 'الملفات')} — ${esc(st.name)}</h2>
       <button class="x" data-action="close-modal">${I.close}</button>
     </div>
-    
     <div class="text-sm text-muted mb-md">
-      ${arNum(uploads.length)} ${uploads.length === 1 ? 'ملف' : 'ملفات'} من ${uploads.length === 1 ? 'معلمة' : 'معلمات'} مختلفة
+      ${arNum(uploads.length)} ${uploads.length === 1 ? 'ملف مرفوع' : 'ملفات مرفوعة'}
     </div>
-    
-    <div class="stack gap-sm">
-      ${uploads.map((upload, idx) => `
-        <div class="card" style="padding:16px">
-          <div class="row between mb-sm">
-            <div class="text-bold">${esc(upload.uploadedByName)}</div>
-            <div class="text-xs text-muted">${fmtDate(upload.uploadedAt?.split('T')[0])}</div>
-          </div>
-          <button class="btn soft sm block" data-action="view-single-pdf" data-url="${esc(upload.url)}">
-            ${I.eye}<span>عرض الملف</span>
-          </button>
-        </div>
-      `).join('')}
+    <div class="stack gap-sm" id="pdf-uploads-list">
+      ${renderList()}
     </div>
   `, { lg: true });
 }
@@ -8204,11 +8227,11 @@ function openIEPPDFUploadModal(sid) {
 
     <form data-form="upload-iep-pdf-form" data-sid="${st.id}">
       <div class="field">
-        <label>رفع ملف جديد ${I.upload}</label>
-        <input type="file" name="pdfFile" accept=".pdf,image/*,application/pdf" required>
-        <div class="text-xs text-muted mt-xs">PDF أو صورة • يمكن رفع أكثر من ملف</div>
+        <label>رفع ملفات جديدة ${I.upload}</label>
+        <input type="file" name="pdfFile" accept=".pdf,image/*,application/pdf" multiple required>
+        <div class="text-xs text-muted mt-xs">PDF أو صورة • يمكن اختيار أكثر من ملف دفعة واحدة</div>
       </div>
-      <button type="submit" class="btn lg block">${I.upload}<span>رفع الملف</span></button>
+      <button type="submit" class="btn lg block">${I.upload}<span>رفع الملفات</span></button>
     </form>
   `);
 }
@@ -10093,7 +10116,7 @@ function openSendToStudentModal(libraryId) {
     return;
   }
   
-  const myStudents = STATE.data.students.filter(s => !s.archived); // Show ALL students
+  const myStudents = STATE.data.students.filter(s => !s.archived); 
   console.log('📚 Opening send modal for:', item.title);
   console.log('👥 My students:', myStudents.length, myStudents);
   console.log('👤 Current user:', STATE.user.id, STATE.user.role);
@@ -12382,82 +12405,71 @@ document.addEventListener('submit', async (e) => {
       const sid = form.getAttribute('data-sid');
       const fkey = form.getAttribute('data-fkey');
       const st = studentBy(sid);
-      const file = formData.get('pdfFile');
-      
+      const files = Array.from(form.querySelector('[name="pdfFile"]').files);
+      const notes = formData.get('notes') || '';
+
       if (!st) throw new Error('Student not found');
-      if (!file || file.size === 0) throw new Error('الرجاء اختيار ملف');
-      // No size limit - upload whatever you want!
-      if (file.type !== 'application/pdf') throw new Error('يجب أن يكون الملف بصيغة PDF');
-      
-      // Upload to Supabase Storage
-      const sanitizedName = file.name
-        .replace(/[^\x00-\x7F]/g, '_')
-        .replace(/\s+/g, '_')
-        .replace(/_{2,}/g, '_');
-      const fileName = `${sid}/${fkey}/${Date.now()}_${sanitizedName}`;
-      
-      // Try Supabase Storage first
-      let fileUrl = null;
-      const { data: uploadData, error: uploadError } = await window.supabaseClient.storage
-        .from('student-documents')
-        .upload(fileName, file, {
-          cacheControl: '3600',
-          upsert: true,
-          contentType: file.type || 'application/pdf'
-        });
-      
-      if (uploadError) {
-        console.error('Storage upload error:', uploadError);
-        // Fallback: store as base64 in students table
-        const reader = new FileReader();
-        const base64 = await new Promise((resolve, reject) => {
-          reader.onload = () => resolve(reader.result);
-          reader.onerror = reject;
-          reader.readAsDataURL(file);
-        });
-        fileUrl = base64;
-        console.log('📁 Using base64 fallback for file storage');
-      } else {
-        fileUrl = fileName;
-        console.log('✅ File uploaded to Supabase Storage:', fileName);
-      }
-      
+      if (!files.length) throw new Error('الرجاء اختيار ملف واحد على الأقل');
+
       // Initialize special_ed_forms if needed
       if (!st.special_ed_forms) st.special_ed_forms = {};
-      
-      // Store as ARRAY to support multiple files per key
-      const newFileEntry = {
-        url: fileUrl,
-        uploadedBy: STATE.user.id,
-        uploadedByName: STATE.user.name,
-        uploadedAt: new Date().toISOString(),
-        notes: formData.get('notes') || ''
-      };
-
-      // Get existing files array
       const existing = st.special_ed_forms[fkey];
       let filesArray = Array.isArray(existing) ? existing :
-                       (existing && typeof existing === 'object' && !existing.url)
-                         ? Object.values(existing)
-                         : existing ? [existing] : [];
-      
-      // Append new file
-      filesArray.push(newFileEntry);
+                       (existing && typeof existing === 'object' && !existing.url) ? Object.values(existing) :
+                       existing ? [existing] : [];
+
+      // Upload each file
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        submitBtn.innerHTML = `<span>جاري رفع ${i + 1} من ${files.length}...</span>`;
+
+        const sanitizedName = file.name
+          .replace(/[^\x00-\x7F]/g, '_')
+          .replace(/\s+/g, '_')
+          .replace(/_{2,}/g, '_');
+        const fileName = `${sid}/${fkey}/${Date.now()}_${i}_${sanitizedName}`;
+
+        let fileUrl = null;
+        const { data: uploadData, error: uploadError } = await window.supabaseClient.storage
+          .from('student-documents')
+          .upload(fileName, file, { cacheControl: '3600', upsert: true, contentType: file.type || 'application/pdf' });
+
+        if (uploadError) {
+          // Fallback: base64
+          const base64 = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          });
+          fileUrl = base64;
+        } else {
+          fileUrl = fileName;
+        }
+
+        filesArray.push({
+          url: fileUrl,
+          name: file.name,
+          uploadedBy: STATE.user.id,
+          uploadedByName: STATE.user.name,
+          uploadedAt: new Date().toISOString(),
+          notes
+        });
+      }
+
       st.special_ed_forms[fkey] = filesArray;
-      
+
       // Save to Supabase
       const { error } = await window.supabaseClient
         .from('students')
         .update({ special_ed_forms: st.special_ed_forms })
         .eq('id', sid);
-      
+
       if (error) throw error;
-      
+
       persistState();
       closeModal();
-      toast(`✅ تم رفع الملف بنجاح من ${STATE.user.name}`);
-      
-      // Reload the page to show updated status
+      toast(`✅ تم رفع ${files.length === 1 ? 'الملف' : `${files.length} ملفات`} بنجاح`);
       handleRoute();
     } catch (error) {
       console.error('Error uploading PDF:', error);
@@ -12616,79 +12628,66 @@ document.addEventListener('submit', async (e) => {
       submitBtn.disabled = true;
       submitBtn.innerHTML = `<span>جاري الرفع...</span>`;
 
-      const formData = new FormData(form);
       const sid = form.getAttribute('data-sid');
       const st = studentBy(sid);
-      const file = formData.get('pdfFile');
-      
-      if (!st) throw new Error('Student not found');
-      if (!file || file.size === 0) throw new Error('الرجاء اختيار ملف');
-      
-      // Upload to Supabase Storage (accept PDF and images)
-      const sanitizedName = file.name
-        .replace(/[^\x00-\x7F]/g, '_')
-        .replace(/\s+/g, '_')
-        .replace(/_{2,}/g, '_');
-      const fileName = `${sid}/iep/${Date.now()}_${sanitizedName}`;
-      
-      let fileUrl = fileName;
-      const { error: uploadError } = await window.supabaseClient.storage
-        .from('student-documents')
-        .upload(fileName, file, { cacheControl: '3600', upsert: true });
-      
-      if (uploadError) {
-        // Fallback to base64
-        const reader = new FileReader();
-        fileUrl = await new Promise((resolve, reject) => {
-          reader.onload = () => resolve(reader.result);
-          reader.onerror = reject;
-          reader.readAsDataURL(file);
-        });
-      }
+      const files = Array.from(form.querySelector('[name="pdfFile"]').files);
 
-      const newPdfEntry = {
-        url: fileUrl,
-        uploadedBy: STATE.user.id,
-        uploadedByName: STATE.user.name,
-        uploadedAt: new Date().toISOString()
-      };
+      if (!st) throw new Error('Student not found');
+      if (!files.length) throw new Error('الرجاء اختيار ملف واحد على الأقل');
 
       // Get existing files and append
       const iep = st.special_ed_iep || {};
       const existingPdfs = Array.isArray(iep.pdf_uploads) ? iep.pdf_uploads :
-                           iep.pdf_upload ? [{ url: iep.pdf_upload }] : [];
-      existingPdfs.push(newPdfEntry);
+                           iep.pdf_upload ? [{ url: iep.pdf_upload, uploadedByName: 'معلمة', uploadedAt: '' }] : [];
 
-      const generatedIEP = generateSmartIEP(st);
-      
-      if (!st.special_ed_iep) {
-        st.special_ed_iep = { ...generatedIEP, pdf_uploads: existingPdfs, pdf_upload: fileUrl };
-      } else {
-        st.special_ed_iep = {
-          ...st.special_ed_iep,
-          pdf_uploads: existingPdfs,
-          pdf_upload: fileUrl,  // keep last for backward compat
-          semester_goals: st.special_ed_iep.semester_goals?.length > 0 ? st.special_ed_iep.semester_goals : generatedIEP.semester_goals,
-          short_term_goals: st.special_ed_iep.short_term_goals?.length > 0 ? st.special_ed_iep.short_term_goals : generatedIEP.short_term_goals,
-          behavioral_goals: st.special_ed_iep.behavioral_goals?.length > 0 ? st.special_ed_iep.behavioral_goals : generatedIEP.behavioral_goals,
-        };
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        submitBtn.innerHTML = `<span>جاري رفع ${i + 1} من ${files.length}...</span>`;
+
+        const sanitizedName = file.name
+          .replace(/[^\x00-\x7F]/g, '_')
+          .replace(/\s+/g, '_')
+          .replace(/_{2,}/g, '_');
+        const fileName = `${sid}/iep/${Date.now()}_${i}_${sanitizedName}`;
+
+        let fileUrl = fileName;
+        const { error: uploadError } = await window.supabaseClient.storage
+          .from('student-documents')
+          .upload(fileName, file, { cacheControl: '3600', upsert: true });
+
+        if (uploadError) {
+          const reader = new FileReader();
+          fileUrl = await new Promise((resolve, reject) => {
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          });
+        }
+
+        existingPdfs.push({
+          url: fileUrl,
+          name: file.name,
+          uploadedBy: STATE.user.id,
+          uploadedByName: STATE.user.name,
+          uploadedAt: new Date().toISOString()
+        });
       }
-      
+
+      if (!st.special_ed_iep) st.special_ed_iep = {};
+      st.special_ed_iep.pdf_uploads = existingPdfs;
+      st.special_ed_iep.pdf_upload = existingPdfs[existingPdfs.length - 1].url; // backward compat
+
       // Save to Supabase
       const { error } = await window.supabaseClient
         .from('students')
         .update({ special_ed_iep: st.special_ed_iep })
         .eq('id', sid);
-      
+
       if (error) throw error;
-      
+
       persistState();
       closeModal();
-      
-      // Show success with AI magic ✨
-      toast('✅ تم رفع الملف واستخراج محتوى الخطة بنجاح!', 'success');
-      
-      // Reload the page
+      toast(`✅ تم رفع ${files.length === 1 ? 'الملف' : `${files.length} ملفات`} بنجاح`);
       handleRoute();
     } catch (error) {
       console.error('Error uploading IEP PDF:', error);
@@ -13021,7 +13020,8 @@ document.addEventListener('submit', async (e) => {
   if (e.target.matches('[data-form="edit-student"]')) {
     e.preventDefault();
     const form = e.target;
-    const studentId = form.dataset.id;
+    const studentId = form.dataset.id || form.dataset.sid;
+    if (!studentId) return; // already handled by the other handler above
     const submitBtn = form.querySelector('button[type="submit"]');
     const originalText = submitBtn.innerHTML;
     
@@ -13176,7 +13176,7 @@ async function loadDataFromSupabase() {
       studentsQuery = studentsQuery.eq('id', STATE.user.id);
     }
     
-    // Teachers and principal see all students in the school
+    // Teachers and principal see ALL students in the school — no teacher_id filter
     
     const { data: students } = await studentsQuery;
     if (students) {
@@ -13843,3 +13843,124 @@ window.addEventListener('load', () => {
     }
   });
 });
+
+
+/* =========================================================
+   EXPORT STUDENT PDF
+   ========================================================= */
+function exportStudentPDF(sid) {
+  const st = studentBy(sid);
+  if (!st) return;
+
+  const plan  = STATE.data.plans.find(p => p.studentId === st.id);
+  const prog  = studentProgress(st);
+  const forms = st.forms || {};
+  const iep   = st.special_ed_iep || {};
+  const schoolName = STATE.config?.school?.name || 'المدرسة';
+  const today = new Date().toLocaleDateString('ar-SA', { year:'numeric', month:'long', day:'numeric' });
+
+  // Collect goals
+  const goals = plan?.goals || [];
+  const goalsHTML = goals.length
+    ? goals.map(g => `<tr><td>${esc(g.text || g.title || '')}</td><td>${esc(g.domain || '')}</td><td>${arNum(g.mastery || 0)}%</td></tr>`).join('')
+    : '<tr><td colspan="3" style="text-align:center;color:#999">لا توجد أهداف مسجلة</td></tr>';
+
+  // Collect uploaded files info
+  const filesSummary = (SPECIAL_ED_FORM_TYPES.filter(f => f.isPDF)).map(ft => {
+    const raw = st.special_ed_forms?.[ft.key] || [];
+    const arr = Array.isArray(raw) ? raw : (raw && typeof raw === 'object' && !raw.url) ? Object.values(raw) : raw ? [raw] : [];
+    return `<tr><td>${esc(ft.name)}</td><td>${arNum(arr.length)} ${arr.length === 1 ? 'ملف' : 'ملفات'}</td></tr>`;
+  }).join('');
+
+  const html = `
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <title>ملف الطالبة — ${esc(st.name)}</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap');
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Tajawal, sans-serif; color: #1a1a2e; background: white; padding: 32px; font-size: 14px; }
+    .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #6E5BC7; padding-bottom: 16px; margin-bottom: 24px; }
+    .school-name { font-size: 13px; color: #666; }
+    .logo { font-size: 28px; font-weight: 800; color: #6E5BC7; }
+    .student-name { font-size: 26px; font-weight: 800; margin-bottom: 4px; }
+    .meta { display: flex; gap: 24px; margin-bottom: 24px; flex-wrap: wrap; }
+    .meta-item { background: #f5f3ff; border-radius: 8px; padding: 10px 16px; }
+    .meta-item .label { font-size: 11px; color: #888; margin-bottom: 2px; }
+    .meta-item .val { font-weight: 700; font-size: 15px; color: #6E5BC7; }
+    h2 { font-size: 16px; font-weight: 700; color: #6E5BC7; margin: 24px 0 12px; border-right: 4px solid #6E5BC7; padding-right: 10px; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+    th { background: #6E5BC7; color: white; padding: 10px 12px; text-align: right; font-weight: 600; font-size: 13px; }
+    td { padding: 9px 12px; border-bottom: 1px solid #ece9f7; font-size: 13px; }
+    tr:last-child td { border-bottom: none; }
+    tr:nth-child(even) td { background: #f9f8ff; }
+    .progress-bar { background: #ece9f7; border-radius: 99px; height: 12px; margin-top: 4px; }
+    .progress-fill { background: #6E5BC7; height: 12px; border-radius: 99px; }
+    .footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid #ddd; display: flex; justify-content: space-between; font-size: 12px; color: #999; }
+    .sig-row { display: flex; gap: 32px; margin-top: 32px; }
+    .sig-box { flex: 1; border-top: 1px solid #999; padding-top: 8px; text-align: center; font-size: 12px; color: #666; }
+    @media print { body { padding: 16px; } }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <div class="school-name">${esc(schoolName)}</div>
+      <div class="student-name">${esc(st.name)}</div>
+    </div>
+    <div class="logo">أثر</div>
+  </div>
+
+  <div class="meta">
+    <div class="meta-item"><div class="label">الصف</div><div class="val">${esc(st.grade || '—')}</div></div>
+    <div class="meta-item"><div class="label">العمر</div><div class="val">${arNum(st.age || '—')} سنة</div></div>
+    <div class="meta-item"><div class="label">ولي الأمر</div><div class="val">${esc(st.parent_phone || '—')}</div></div>
+    <div class="meta-item"><div class="label">نسبة التقدم</div>
+      <div class="val">${arNum(prog)}%</div>
+      <div class="progress-bar"><div class="progress-fill" style="width:${prog}%"></div></div>
+    </div>
+  </div>
+
+  <h2>الأهداف التعليمية</h2>
+  <table>
+    <thead><tr><th>الهدف</th><th>المجال</th><th>نسبة الإتقان</th></tr></thead>
+    <tbody>${goalsHTML}</tbody>
+  </table>
+
+  ${filesSummary ? `
+  <h2>الملفات المرفوعة</h2>
+  <table>
+    <thead><tr><th>نوع الملف</th><th>عدد الملفات</th></tr></thead>
+    <tbody>${filesSummary}</tbody>
+  </table>` : ''}
+
+  ${iep.current_level ? `
+  <h2>المستوى الحالي</h2>
+  <p style="line-height:1.8;color:#444">${esc(iep.current_level)}</p>` : ''}
+
+  ${iep.strengths ? `
+  <h2>نقاط القوة</h2>
+  <p style="line-height:1.8;color:#444">${esc(iep.strengths)}</p>` : ''}
+
+  <div class="sig-row">
+    <div class="sig-box">المعلمة المسؤولة</div>
+    <div class="sig-box">مديرة المدرسة</div>
+    <div class="sig-box">ولي الأمر</div>
+  </div>
+
+  <div class="footer">
+    <span>أثر — نظام متابعة الطالبات</span>
+    <span>${today}</span>
+  </div>
+
+  <script>window.onload = () => { window.print(); }<\/script>
+</body>
+</html>`;
+
+  const win = window.open('', '_blank');
+  if (!win) { toast('الرجاء السماح بالنوافذ المنبثقة', 'warn'); return; }
+  win.document.write(html);
+  win.document.close();
+}
