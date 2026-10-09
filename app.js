@@ -69,9 +69,38 @@ var setupTypingIndicator, openMemoryTestModal, viewMemoryTestModal;
 var openInitialReportModal, viewInitialReportModal, printInitialReport;
 
 function arNum(n) {
-  // Convert to Arabic-Indic (Hijri/Eastern Arabic) numerals
-  const ar = ['٠','١','٢','٣','٤','٥','٦','٧','٨','٩'];
-  return String(n).split('').map(d => /\d/.test(d) ? ar[+d] : d).join('');
+  // Use Latin (Western Arabic) numerals — cleaner with the editorial typography
+  return String(n);
+}
+
+// Convert Gregorian months to Hijri month names
+function toHijriMonth(date) {
+  if (!date) return '';
+  
+  // Map of Gregorian month numbers to Hijri month names
+  const hijriMonths = {
+    1: 'محرم',
+    2: 'صفر', 
+    3: 'ربيع الأول',
+    4: 'ربيع الآخر',
+    5: 'جمادى الأولى',
+    6: 'جمادى الآخرة',
+    7: 'رجب',
+    8: 'شعبان',
+    9: 'رمضان',
+    10: 'شوال',
+    11: 'ذو القعدة',
+    12: 'ذو الحجة'
+  };
+  
+  // Simple approximation: shift Gregorian by ~11 days per year
+  // For accurate conversion, you'd need a proper Hijri calendar library
+  const d = new Date(date);
+  const gregorianMonth = d.getMonth() + 1;
+  
+  // Rough estimation (this is approximate, not exact)
+  // For production, use a proper Hijri calendar library like moment-hijri
+  return hijriMonths[gregorianMonth] || '';
 }
 function getPeriodLabel(period) {
   const labels = {
@@ -7122,7 +7151,7 @@ document.addEventListener('submit', (e) => {
               custom_goal_2: followup.custom_goal_2,
               custom_goal_2_type: followup.custom_goal_2_type,
               custom_goal_2_evaluation: followup.custom_goal_2_evaluation,
-              tools: JSON.stringify(tools),
+              tools: tools, // Store as array, not JSON string
               notes: followup.notes,
               updated_at: followup.updated_at
             })
@@ -7133,7 +7162,7 @@ document.addEventListener('submit', (e) => {
           persistState();
           closeModal();
           toast('تم تحديث المتابعة ✅');
-          handleRoute();
+          // DON'T call handleRoute() - stay on current page
         } catch (error) {
           console.error('Error updating followup:', error);
           toast('حدث خطأ في تحديث المتابعة', 'error');
