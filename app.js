@@ -5899,7 +5899,7 @@ document.addEventListener('click', async (e) => {
       
       persistState();
       toast('تم حذف المتابعة');
-      handleRoute();
+      // DON'T call handleRoute() - stay on current page
       return;
     }
     
@@ -7096,7 +7096,7 @@ document.addEventListener('submit', (e) => {
         persistState();
         closeModal();
         toast('تم حفظ المتابعة ✅');
-        handleRoute();
+        // DON'T call handleRoute() - stay on current page
       } catch (error) {
         console.error('Error saving followup:', error);
         toast('حدث خطأ في حفظ المتابعة', 'error');
@@ -7219,7 +7219,7 @@ document.addEventListener('submit', (e) => {
         persistState();
         closeModal();
         toast('تم حفظ الاختبار ✅');
-        handleRoute();
+        // DON'T call handleRoute() - stay on current page
       } catch (error) {
         console.error('Error saving memory test:', error);
         toast('حدث خطأ في حفظ الاختبار', 'error');
@@ -7276,7 +7276,7 @@ document.addEventListener('submit', (e) => {
         persistState();
         closeModal();
         toast('تم حفظ التقرير ✅');
-        handleRoute();
+        // DON'T call handleRoute() - stay on current page
       } catch (error) {
         console.error('Error saving initial report:', error);
         toast('حدث خطأ في حفظ التقرير', 'error');
@@ -7321,7 +7321,7 @@ document.addEventListener('submit', (e) => {
           persistState();
           closeModal();
           toast('تم تحديث التقرير ✅');
-          handleRoute();
+          // DON'T call handleRoute() - stay on current page
         } catch (error) {
           console.error('Error updating initial report:', error);
           toast('حدث خطأ في تحديث التقرير', 'error');
