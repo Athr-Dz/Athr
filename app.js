@@ -73,35 +73,6 @@ function arNum(n) {
   return String(n);
 }
 
-// Convert Gregorian months to Hijri month names
-function toHijriMonth(date) {
-  if (!date) return '';
-  
-  // Map of Gregorian month numbers to Hijri month names
-  const hijriMonths = {
-    1: 'محرم',
-    2: 'صفر', 
-    3: 'ربيع الأول',
-    4: 'ربيع الآخر',
-    5: 'جمادى الأولى',
-    6: 'جمادى الآخرة',
-    7: 'رجب',
-    8: 'شعبان',
-    9: 'رمضان',
-    10: 'شوال',
-    11: 'ذو القعدة',
-    12: 'ذو الحجة'
-  };
-  
-  // Simple approximation: shift Gregorian by ~11 days per year
-  // For accurate conversion, you'd need a proper Hijri calendar library
-  const d = new Date(date);
-  const gregorianMonth = d.getMonth() + 1;
-  
-  // Rough estimation (this is approximate, not exact)
-  // For production, use a proper Hijri calendar library like moment-hijri
-  return hijriMonths[gregorianMonth] || '';
-}
 function getPeriodLabel(period) {
   const labels = {
     '1': 'الحصة الأولى',
@@ -231,8 +202,19 @@ const fmtDate = (iso) => {
   if (!iso) return '';
   const d = new Date(iso);
   const day = d.getDate();
-  const months = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
-  return `${day} ${months[d.getMonth()]}`;
+  
+  // Use Hijri month names
+  const hijriMonths = [
+    'محرم', 'صفر', 'ربيع الأول', 'ربيع الآخر',
+    'جمادى الأولى', 'جمادى الآخرة', 'رجب', 'شعبان',
+    'رمضان', 'شوال', 'ذو القعدة', 'ذو الحجة'
+  ];
+  
+  // Rough approximation: shift by ~11 days per year
+  const gregorianMonth = d.getMonth();
+  const hijriMonthIndex = (gregorianMonth + Math.floor(d.getFullYear() / 33)) % 12;
+  
+  return `${day} ${hijriMonths[hijriMonthIndex]}`;
 };
 const fmtRelative = (iso) => {
   const d = new Date(iso); const now = new Date();
@@ -5879,6 +5861,10 @@ document.addEventListener('click', async (e) => {
       const id = action.getAttribute('data-id');
       if (!confirm('حذف هذه المتابعة؟')) return;
       
+      // Get student ID BEFORE deleting the followup
+      const followupToDelete = STATE.data.studentFollowups.find(f => f.id === id);
+      const studentId = followupToDelete?.studentId;
+      
       STATE.data.studentFollowups = STATE.data.studentFollowups.filter(f => f.id !== id);
       
       // Delete from Supabase
@@ -5899,7 +5885,18 @@ document.addEventListener('click', async (e) => {
       
       persistState();
       toast('تم حذف المتابعة');
-      // DON'T call handleRoute() - stay on current page
+      // Refresh the current view
+      const currentTab = document.querySelector('.tab.active');
+      if (currentTab) {
+        const tabName = currentTab.getAttribute('data-tab');
+        if (tabName === 'speech-plan' && studentId) {
+          const container = document.querySelector('[data-tab-content="speech-plan"]');
+          if (container) {
+            const st = studentBy(studentId);
+            container.innerHTML = renderSpeechPlanTab(st);
+          }
+        }
+      }
       return;
     }
     
@@ -7096,7 +7093,19 @@ document.addEventListener('submit', (e) => {
         persistState();
         closeModal();
         toast('تم حفظ المتابعة ✅');
-        // DON'T call handleRoute() - stay on current page
+        // Refresh the current view to show the new followup
+        const currentTab = document.querySelector('.tab.active');
+        if (currentTab) {
+          const tabName = currentTab.getAttribute('data-tab');
+          if (tabName === 'speech-plan') {
+            // Re-render the speech plan tab
+            const container = document.querySelector('[data-tab-content="speech-plan"]');
+            if (container) {
+              const st = studentBy(sid);
+              container.innerHTML = renderSpeechPlanTab(st);
+            }
+          }
+        }
       } catch (error) {
         console.error('Error saving followup:', error);
         toast('حدث خطأ في حفظ المتابعة', 'error');
@@ -7165,7 +7174,18 @@ document.addEventListener('submit', (e) => {
           persistState();
           closeModal();
           toast('تم تحديث المتابعة ✅');
-          // DON'T call handleRoute() - stay on current page
+          // Refresh the current view to show updated followup
+          const currentTab = document.querySelector('.tab.active');
+          if (currentTab) {
+            const tabName = currentTab.getAttribute('data-tab');
+            if (tabName === 'speech-plan') {
+              const container = document.querySelector('[data-tab-content="speech-plan"]');
+              if (container) {
+                const st = studentBy(followup.studentId);
+                container.innerHTML = renderSpeechPlanTab(st);
+              }
+            }
+          }
         } catch (error) {
           console.error('Error updating followup:', error);
           toast('حدث خطأ في تحديث المتابعة', 'error');
