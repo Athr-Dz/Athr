@@ -7112,28 +7112,41 @@ document.addEventListener('submit', (e) => {
     const id = fEditFollowup.getAttribute('data-id');
     const fd = new FormData(fEditFollowup);
     
-    const tools = Array.from(fEditFollowup.querySelectorAll('input[name="tools"]:checked'))
+    // Get reinforcement checkboxes
+    const reinforcement = Array.from(fEditFollowup.querySelectorAll('input[name="reinforcement"]:checked'))
       .map(cb => cb.value);
+
+    // Get tools from dropdowns
+    const tools = ['tools_1','tools_2','tools_3']
+      .map(n => fd.get(n)).filter(v => v && v !== '');
+
+    // Build plan_goals object from form fields (NEW structure)
+    const plan_goals = {
+      receptive: {
+        goal: fd.get('receptive_goal') || '',
+        teaching: [fd.get('receptive_teaching_1'), fd.get('receptive_teaching_2'), fd.get('receptive_teaching_3')].filter(v => v && v !== ''),
+      },
+      expressive: {
+        goal: fd.get('expressive_goal') || '',
+        teaching: [fd.get('expressive_teaching_1'), fd.get('expressive_teaching_2'), fd.get('expressive_teaching_3')].filter(v => v && v !== ''),
+      },
+      articulation: {
+        goal: fd.get('articulation_goal') || '',
+        teaching: [fd.get('articulation_teaching_1'), fd.get('articulation_teaching_2'), fd.get('articulation_teaching_3')].filter(v => v && v !== ''),
+      },
+      tools,
+      reinforcement,
+    };
     
     const followup = STATE.data.studentFollowups.find(f => f.id === id);
     if (followup) {
       followup.date_from = fd.get('date_from');
       followup.date_to = fd.get('date_to');
-      followup.goal_1_id = fd.get('goal_1_id') || null;
-      followup.goal_1_evaluation = fd.get('goal_1_evaluation') || null;
-      followup.goal_2_id = fd.get('goal_2_id') || null;
-      followup.goal_2_evaluation = fd.get('goal_2_evaluation') || null;
-      followup.custom_goal_1 = fd.get('custom_goal_1') || null;
-      followup.custom_goal_1_type = fd.get('custom_goal_1_type') || null;
-      followup.custom_goal_1_evaluation = fd.get('custom_goal_1_evaluation') || null;
-      followup.custom_goal_2 = fd.get('custom_goal_2') || null;
-      followup.custom_goal_2_type = fd.get('custom_goal_2_type') || null;
-      followup.custom_goal_2_evaluation = fd.get('custom_goal_2_evaluation') || null;
-      followup.tools = tools;
+      followup.plan_goals = plan_goals;
       followup.notes = fd.get('notes') || '';
       followup.updated_at = new Date().toISOString();
       
-      // Update in Supabase
+      // Update in Supabase with NEW structure
       (async () => {
         try {
           const { error } = await window.supabaseClient
@@ -7141,17 +7154,7 @@ document.addEventListener('submit', (e) => {
             .update({
               date_from: followup.date_from,
               date_to: followup.date_to,
-              goal_1_id: followup.goal_1_id,
-              goal_1_evaluation: followup.goal_1_evaluation,
-              goal_2_id: followup.goal_2_id,
-              goal_2_evaluation: followup.goal_2_evaluation,
-              custom_goal_1: followup.custom_goal_1,
-              custom_goal_1_type: followup.custom_goal_1_type,
-              custom_goal_1_evaluation: followup.custom_goal_1_evaluation,
-              custom_goal_2: followup.custom_goal_2,
-              custom_goal_2_type: followup.custom_goal_2_type,
-              custom_goal_2_evaluation: followup.custom_goal_2_evaluation,
-              tools: tools, // Store as array, not JSON string
+              plan_goals: plan_goals,
               notes: followup.notes,
               updated_at: followup.updated_at
             })
@@ -10997,88 +11000,106 @@ function openEditFollowupModal(id) {
   if (!followup) return;
   
   const st = studentBy(followup.studentId);
-  const plan = STATE.data.plans.find(p => p.studentId === followup.studentId);
-  const planGoals = plan?.goals || [];
+  const plan_goals = followup.plan_goals || {};
   
   openModal(`
     <div class="modal-head">
-      <h2>✏️ تعديل المتابعة</h2>
+      <h2>✏️ تعديل المتابعة — ${esc(st.name)}</h2>
       <button class="x" data-action="close-modal">${I.close}</button>
     </div>
-    <form data-form="edit-followup" data-id="${id}">
-      <!-- Same form as add but with pre-filled values -->
+    <form data-form="edit-followup" data-id="${id}" style="max-height:80vh;overflow-y:auto;padding:4px">
+
+      <!-- التاريخ -->
       <div class="field-group">
         <label class="section-label">📅 فترة المتابعة</label>
         <div class="row" style="gap:12px">
           <div class="field" style="flex:1">
             <label>من</label>
-            <input name="date_from" type="date" value="${followup.date_from}" required>
+            <input name="date_from" type="date" value="${followup.date_from || ''}" required>
           </div>
           <div class="field" style="flex:1">
             <label>إلى</label>
-            <input name="date_to" type="date" value="${followup.date_to}" required>
+            <input name="date_to" type="date" value="${followup.date_to || ''}" required>
           </div>
         </div>
       </div>
 
+      <!-- الاستقبالي -->
       <div class="field-group">
-        <label class="section-label">🎯 الأهداف من الخطة الفردية</label>
+        <label class="section-label">👂 الجانب الاستقبالي</label>
         <div class="field">
-          <label>الهدف الأول</label>
-          <select name="goal_1_id">
-            <option value="">-- اختر هدف من الخطة --</option>
-            ${planGoals.map(g => `<option value="${g.id}" ${followup.goal_1_id === g.id ? 'selected' : ''}>${esc(g.text || g.goal || g)}</option>`).join('')}
-          </select>
+          <label>الهدف</label>
+          <textarea name="receptive_goal" rows="2" placeholder="الهدف الاستقبالي...">${esc(plan_goals.receptive?.goal || '')}</textarea>
         </div>
-        <div class="field">
-          <label>الهدف الثاني</label>
-          <select name="goal_2_id">
-            <option value="">-- اختر هدف من الخطة --</option>
-            ${planGoals.map(g => `<option value="${g.id}" ${followup.goal_2_id === g.id ? 'selected' : ''}>${esc(g.text || g.goal || g)}</option>`).join('')}
-          </select>
-        </div>
+        <label class="text-sm text-muted mt-sm">الأساليب التدريسية المستخدمة:</label>
+        ${[1,2,3].map(i => `
+          <div class="field">
+            <input type="text" name="receptive_teaching_${i}" placeholder="الأسلوب ${i}" value="${esc(plan_goals.receptive?.teaching?.[i-1] || '')}">
+          </div>
+        `).join('')}
       </div>
 
+      <!-- التعبيري -->
       <div class="field-group">
-        <label class="section-label">✍️ أهداف يدوية (اختياري)</label>
+        <label class="section-label">💬 الجانب التعبيري</label>
         <div class="field">
-          <label>هدف يدوي أول</label>
-          <textarea name="custom_goal_1" rows="2">${esc(followup.custom_goal_1 || '')}</textarea>
-          <select name="custom_goal_1_type" class="mt-xs">
-            <option value="">-- نوع الهدف --</option>
-            <option value="تمهيدي" ${followup.custom_goal_1_type === 'تمهيدي' ? 'selected' : ''}>تمهيدي</option>
-            <option value="استقبالي" ${followup.custom_goal_1_type === 'استقبالي' ? 'selected' : ''}>استقبالي</option>
-            <option value="تعبيري" ${followup.custom_goal_1_type === 'تعبيري' ? 'selected' : ''}>تعبيري</option>
-            <option value="نطق" ${followup.custom_goal_1_type === 'نطق' ? 'selected' : ''}>نطق</option>
-          </select>
+          <label>الهدف</label>
+          <textarea name="expressive_goal" rows="2" placeholder="الهدف التعبيري...">${esc(plan_goals.expressive?.goal || '')}</textarea>
         </div>
-        <div class="field">
-          <label>هدف يدوي ثاني</label>
-          <textarea name="custom_goal_2" rows="2">${esc(followup.custom_goal_2 || '')}</textarea>
-          <select name="custom_goal_2_type" class="mt-xs">
-            <option value="">-- نوع الهدف --</option>
-            <option value="تمهيدي" ${followup.custom_goal_2_type === 'تمهيدي' ? 'selected' : ''}>تمهيدي</option>
-            <option value="استقبالي" ${followup.custom_goal_2_type === 'استقبالي' ? 'selected' : ''}>استقبالي</option>
-            <option value="تعبيري" ${followup.custom_goal_2_type === 'تعبيري' ? 'selected' : ''}>تعبيري</option>
-            <option value="نطق" ${followup.custom_goal_2_type === 'نطق' ? 'selected' : ''}>نطق</option>
-          </select>
-        </div>
+        <label class="text-sm text-muted mt-sm">الأساليب التدريسية المستخدمة:</label>
+        ${[1,2,3].map(i => `
+          <div class="field">
+            <input type="text" name="expressive_teaching_${i}" placeholder="الأسلوب ${i}" value="${esc(plan_goals.expressive?.teaching?.[i-1] || '')}">
+          </div>
+        `).join('')}
       </div>
 
+      <!-- النطق -->
+      <div class="field-group">
+        <label class="section-label">🗣️ جانب النطق</label>
+        <div class="field">
+          <label>الهدف</label>
+          <textarea name="articulation_goal" rows="2" placeholder="هدف النطق...">${esc(plan_goals.articulation?.goal || '')}</textarea>
+        </div>
+        <label class="text-sm text-muted mt-sm">الأساليب التدريسية المستخدمة:</label>
+        ${[1,2,3].map(i => `
+          <div class="field">
+            <input type="text" name="articulation_teaching_${i}" placeholder="الأسلوب ${i}" value="${esc(plan_goals.articulation?.teaching?.[i-1] || '')}">
+          </div>
+        `).join('')}
+      </div>
+
+      <!-- الوسائل -->
       <div class="field-group">
         <label class="section-label">🛠️ الوسائل المستخدمة</label>
+        ${[1,2,3].map(i => `
+          <div class="field">
+            <select name="tools_${i}">
+              <option value="">-- اختر وسيلة ${i} --</option>
+              ${['بطاقات الصور', 'قصص', 'فيديو', 'مجسمات', 'ألعاب إلكترونية', 'السبورة', 'ألعاب تركيب', 'مرآة', 'بطاقات حروف'].map(tool => 
+                `<option value="${tool}" ${plan_goals.tools?.[i-1] === tool ? 'selected' : ''}>${tool}</option>`
+              ).join('')}
+            </select>
+          </div>
+        `).join('')}
+      </div>
+
+      <!-- التعزيز -->
+      <div class="field-group">
+        <label class="section-label">⭐ أساليب التعزيز المستخدمة</label>
         <div class="checkbox-group">
-          ${['بطاقات صور', 'قصص', 'سبورة', 'مجسمات', 'آيباد', 'مرآة', 'العاب تركيز وانتباه'].map(tool => `
+          ${['مادي', 'معنوي', 'نقاط', 'نجوم'].map(r => `
             <label class="checkbox-label">
-              <input type="checkbox" name="tools" value="${tool}" ${followup.tools?.includes(tool) ? 'checked' : ''}> ${tool}
+              <input type="checkbox" name="reinforcement" value="${r}" ${plan_goals.reinforcement?.includes(r) ? 'checked' : ''}> ${r}
             </label>
           `).join('')}
         </div>
       </div>
 
+      <!-- ملاحظات -->
       <div class="field">
         <label>ملاحظات (اختياري)</label>
-        <textarea name="notes" rows="3">${esc(followup.notes || '')}</textarea>
+        <textarea name="notes" rows="3" placeholder="أي ملاحظات إضافية...">${esc(followup.notes || '')}</textarea>
       </div>
 
       <button type="submit" class="btn lg block">${I.check}<span>حفظ التعديلات</span></button>
